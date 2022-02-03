@@ -9,27 +9,29 @@
 
 #include <AudioControlsEditorWindow.h>
 
-#include <AzCore/StringFunc/StringFunc.h>
+#include <AzCore/Utils/Utils.h>
+
+#include <AzToolsFramework/API/ToolsApplicationAPI.h>
+
 #include <ATLControlsModel.h>
 #include <ATLControlsPanel.h>
 #include <AudioControlsEditorPlugin.h>
 #include <AudioControlsEditorUndo.h>
+#include <AudioFileUtils.h>
 #include <AudioSystemPanel.h>
-#include <CryFile.h>
-#include <CryPath.h>
-#include <DockTitleBarWidget.h>
 #include <IAudioSystem.h>
 #include <ImplementationManager.h>
 #include <InspectorPanel.h>
-#include <ISystem.h>
 #include <QAudioControlEditorIcons.h>
-#include <Util/PathUtil.h>
+
+#include <DockTitleBarWidget.h>
 
 #include <QPaintEvent>
 #include <QPushButton>
 #include <QApplication>
 #include <QPainter>
 #include <QMessageBox>
+
 
 void InitACEResources()
 {
@@ -106,47 +108,17 @@ namespace AudioControls
     {
         m_fileSystemWatcher.addPath(folder.data());
 
-        AZStd::string search;
-        AZ::StringFunc::Path::Join(folder.data(), "*", search, true, false);
-        auto pCryPak = gEnv->pCryPak;
-        AZ::IO::ArchiveFileIterator handle = pCryPak->FindFirst(search.c_str());
-        if (handle)
+        auto fileIO = AZ::IO::FileIOBase::GetInstance();
+        auto foundFiles = Audio::FindFilesInPath(folder, "*");
+        for (auto& file : foundFiles)
         {
-            do
+            if (fileIO->IsDirectory(file.c_str()))
             {
-                AZStd::string sName = static_cast<AZStd::string_view>(handle.m_filename);
-                if (!sName.empty() && sName[0] != '.')
-                {
-                    if ((handle.m_fileDesc.nAttrib & AZ::IO::FileDesc::Attribute::Subdirectory) == AZ::IO::FileDesc::Attribute::Subdirectory)
-                    {
-                        AZ::StringFunc::Path::Join(folder.data(), sName.c_str(), sName);
-                        StartWatchingFolder(sName);
-                    }
-                }
-            } while (handle = pCryPak->FindNext(handle));
-            pCryPak->FindClose(handle);
-        }
-    }
-
-    //-------------------------------------------------------------------------------------------//
-    void CAudioControlsEditorWindow::keyPressEvent(QKeyEvent* pEvent)
-    {
-        if (pEvent->key() == Qt::Key_S && pEvent->modifiers() == Qt::ControlModifier)
-        {
-            Save();
-        }
-        else if (pEvent->key() == Qt::Key_Z && (pEvent->modifiers() & Qt::ControlModifier))
-        {
-            if (pEvent->modifiers() & Qt::ShiftModifier)
-            {
-                GetIEditor()->Redo();
-            }
-            else
-            {
-                GetIEditor()->Undo();
+                AZ::IO::FixedMaxPath resolvedPath;
+                fileIO->ReplaceAlias(resolvedPath, file);
+                StartWatchingFolder(file.Native());
             }
         }
-        QMainWindow::keyPressEvent(pEvent);
     }
 
     //-------------------------------------------------------------------------------------------//
@@ -227,6 +199,20 @@ namespace AudioControls
     }
 
     //-------------------------------------------------------------------------------------------//
+    void CAudioControlsEditorWindow::RefreshAudioSystem()
+    {
+        QString sLevelName = GetIEditor()->GetLevelName();
+
+        if (QString::compare(sLevelName, "Untitled", Qt::CaseInsensitive) == 0)
+        {
+            // Rather pass empty QString to indicate that no level is loaded!
+            sLevelName = QString();
+        }
+
+        Audio::AudioSystemRequestBus::Broadcast(&Audio::AudioSystemRequestBus::Events::RefreshAudioSystem, sLevelName.toUtf8().data());
+    }
+
+    //-------------------------------------------------------------------------------------------//
     void CAudioControlsEditorWindow::Save()
     {
         bool bPreloadsChanged = m_pATLModel->IsTypeDirty(eACET_PRELOAD);
@@ -243,15 +229,7 @@ namespace AudioControls
             messageBox.setWindowTitle("Audio Controls Editor");
             if (messageBox.exec() == QMessageBox::Yes)
             {
-                QString sLevelName = GetIEditor()->GetLevelName();
-
-                if (QString::compare(sLevelName, "Untitled", Qt::CaseInsensitive) == 0)
-                {
-                    // Rather pass empty QString to indicate that no level is loaded!
-                    sLevelName = QString();
-                }
-
-                Audio::AudioSystemRequestBus::Broadcast(&Audio::AudioSystemRequestBus::Events::RefreshAudioSystem, sLevelName.toUtf8().data());
+                RefreshAudioSystem();
             }
         }
         m_pATLModel->ClearDirtyFlags();
@@ -318,19 +296,24 @@ namespace AudioControls
         // once we can listen to delete messages from Asset system, this can be changed to an EBus handler.
         const char* controlsPath = nullptr;
         Audio::AudioSystemRequestBus::BroadcastResult(controlsPath, &Audio::AudioSystemRequestBus::Events::GetControlsPath);
-        AZStd::string sControlsPath(Path::GetEditingGameDataFolder());
-        AZ::StringFunc::Path::Join(sControlsPath.c_str(), controlsPath, sControlsPath);
-        Audio::SAudioManagerRequestData<Audio::eAMRT_PARSE_CONTROLS_DATA> oParseGlobalRequestData(sControlsPath.c_str(), Audio::eADS_GLOBAL);
+
+        AZ::IO::FixedMaxPath controlsFolder{ controlsPath };
+
+        Audio::SAudioManagerRequestData<Audio::eAMRT_PARSE_CONTROLS_DATA> oParseGlobalRequestData(controlsFolder.c_str(), Audio::eADS_GLOBAL);
         oConfigDataRequest.pData = &oParseGlobalRequestData;
         Audio::AudioSystemRequestBus::Broadcast(&Audio::AudioSystemRequestBus::Events::PushRequest, oConfigDataRequest);
 
         // parse the AudioSystem level-specific config data
-        AZStd::string levelName{ GetIEditor()->GetLevelName().toUtf8().data() };
-        AZ::StringFunc::Path::Join(sControlsPath.c_str(), "levels", sControlsPath);
-        AZ::StringFunc::Path::Join(sControlsPath.c_str(), levelName.c_str(), sControlsPath);
-        Audio::SAudioManagerRequestData<Audio::eAMRT_PARSE_CONTROLS_DATA> oParseLevelRequestData(sControlsPath.c_str(), Audio::eADS_LEVEL_SPECIFIC);
-        oConfigDataRequest.pData = &oParseLevelRequestData;
-        Audio::AudioSystemRequestBus::Broadcast(&Audio::AudioSystemRequestBus::Events::PushRequest, oConfigDataRequest);
+        AZStd::string levelName;
+        AzToolsFramework::EditorRequestBus::BroadcastResult(levelName, &AzToolsFramework::EditorRequests::GetLevelName);
+        if (!levelName.empty() && levelName != "Untitled")
+        {
+            controlsFolder /= "levels";
+            controlsFolder /= levelName;
+            Audio::SAudioManagerRequestData<Audio::eAMRT_PARSE_CONTROLS_DATA> oParseLevelRequestData(controlsFolder.c_str(), Audio::eADS_LEVEL_SPECIFIC);
+            oConfigDataRequest.pData = &oParseLevelRequestData;
+            Audio::AudioSystemRequestBus::Broadcast(&Audio::AudioSystemRequestBus::Events::PushRequest, oConfigDataRequest);
+        }
 
         // inform the middleware specific plugin that the data has been saved
         // to disk (in case it needs to update something)

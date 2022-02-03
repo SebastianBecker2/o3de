@@ -33,7 +33,7 @@ struct VSInput
 
 struct VSOutput
 {
-    float4 m_position : SV_Position;
+    precise linear centroid float4 m_position : SV_Position;
     float3 m_normal: NORMAL;
     float3 m_tangent : TANGENT; 
     float3 m_bitangent : BITANGENT; 
@@ -63,6 +63,7 @@ ForwardPassOutput MinimalPBR_MainPassPS(VSOutput IN)
     // Position, Normal, Roughness
     surface.position = IN.m_worldPosition.xyz;
     surface.normal = normalize(IN.m_normal);
+    surface.vertexNormal = normalize(IN.m_normal);
     surface.roughnessLinear = MinimalPBRSrg::m_roughness;
     surface.CalculateRoughnessA();
 
@@ -70,9 +71,8 @@ ForwardPassOutput MinimalPBR_MainPassPS(VSOutput IN)
     const float specularF0Factor = 0.5f;
     surface.SetAlbedoAndSpecularF0(MinimalPBRSrg::m_baseColor, specularF0Factor, MinimalPBRSrg::m_metallic);
 
-    // Clear Coat, Transmission
+    // Clear Coat
     surface.clearCoat.InitializeToZero();
-    surface.transmission.InitializeToZero();
 
     // ------- LightingData -------
 
@@ -103,7 +103,7 @@ ForwardPassOutput MinimalPBR_MainPassPS(VSOutput IN)
     ApplyIBL(surface, lightingData);
 
     // Finalize Lighting
-    lightingData.FinalizeLighting(surface.transmission.tint);
+    lightingData.FinalizeLighting();
 
     PbrLightingOutput lightingOutput = GetPbrLightingOutput(surface, lightingData, alpha);
 

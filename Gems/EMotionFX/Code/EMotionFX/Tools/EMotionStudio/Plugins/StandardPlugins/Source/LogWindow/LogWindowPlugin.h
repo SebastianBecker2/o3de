@@ -6,10 +6,10 @@
  *
  */
 
-#ifndef __EMSTUDIO_LOGWINDOWPLUGIN_H
-#define __EMSTUDIO_LOGWINDOWPLUGIN_H
+#pragma once
 
 #if !defined(Q_MOC_RUN)
+#include <MCore/Source/LogManager.h>
 #include "../StandardPluginsConfig.h"
 #include "../../../../EMStudioSDK/Source/DockWidgetPlugin.h"
 #endif
@@ -60,9 +60,7 @@ namespace EMStudio
     private:
         void AddFilter(const QString& name, MCore::LogCallback::ELogLevel level, bool enabled);
 
-        LogWindowCallback* mLogCallback;
-        AzQtComponents::FilteredSearchWidget* mSearchWidget;
+        LogWindowCallback* m_logCallback;
+        AzQtComponents::FilteredSearchWidget* m_searchWidget;
     };
 }   // namespace EMStudio
-
-#endif

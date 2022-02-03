@@ -9,6 +9,7 @@
 #include <AzTest/AzTest.h>
 #include <AzTest/Utils.h>
 #include <AzCore/Memory/OSAllocator.h>
+#include <AzCore/IO/Streamer/FileRequest.h>
 #include <AzCore/std/containers/map.h>
 #include <AzCore/std/string/string.h>
 #include <AzCore/StringFunc/StringFunc.h>
@@ -20,8 +21,6 @@
 #include <ATL.h>
 
 #include <Mocks/ATLEntitiesMock.h>
-#include <Mocks/IAudioSystemImplementationMock.h>
-#include <Mocks/IAudioSystemMock.h>
 #include <Mocks/FileCacheManagerMock.h>
 
 #include <Mocks/IConsoleMock.h>
@@ -589,7 +588,7 @@ TEST(AudioFlagsTest, AudioFlags_OneFlag_OneFlagIsSet)
 {
     const AZ::u8 flagBit = 1 << 4;
     Audio::Flags<AZ::u8> testFlags(flagBit);
-    EXPECT_FALSE(testFlags.AreAnyFlagsActive(~flagBit));
+    EXPECT_FALSE(testFlags.AreAnyFlagsActive(static_cast<AZ::u8>(~flagBit)));
     EXPECT_TRUE(testFlags.AreAnyFlagsActive(flagBit));
     EXPECT_TRUE(testFlags.AreAnyFlagsActive(flagBit | 1));
     EXPECT_TRUE(testFlags.AreAllFlagsActive(flagBit));
@@ -603,7 +602,7 @@ TEST(AudioFlagsTest, AudioFlags_MultipleFlags_MultipleFlagsAreSet)
 {
     const AZ::u8 flagBits = (1 << 5) | (1 << 2) | (1 << 3);
     Audio::Flags<AZ::u8> testFlags(flagBits);
-    EXPECT_FALSE(testFlags.AreAnyFlagsActive(~flagBits));
+    EXPECT_FALSE(testFlags.AreAnyFlagsActive(static_cast<AZ::u8>(~flagBits)));
     EXPECT_TRUE(testFlags.AreAnyFlagsActive(flagBits));
     EXPECT_TRUE(testFlags.AreAllFlagsActive(flagBits));
     EXPECT_FALSE(testFlags.AreAllFlagsActive(flagBits | 1));
@@ -1051,7 +1050,7 @@ public:
         // Replace with a new LocalFileIO...
         m_fileIO = AZStd::make_unique<AZ::IO::LocalFileIO>();
         AZ::IO::FileIOBase::SetInstance(m_fileIO.get());
-        
+
         AZStd::string rootFolder(AZ::Test::GetCurrentExecutablePath());
         AZ::StringFunc::Path::Join(rootFolder.c_str(), "Test.Assets/Gems/AudioSystem/ATLData", rootFolder);
 

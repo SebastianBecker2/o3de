@@ -6,8 +6,7 @@
  *
  */
 
-#ifndef __EMSTUDIO_ATTACHMENTSHIERARCHYWINDOW_H
-#define __EMSTUDIO_ATTACHMENTSHIERARCHYWINDOW_H
+#pragma once
 
 // include MCore
 #if !defined(Q_MOC_RUN)
@@ -39,9 +38,6 @@ namespace EMStudio
 
     private:
         void RecursivelyAddAttachments(QTreeWidgetItem* parent, EMotionFX::ActorInstance* actorInstance);
-        QTreeWidget* mHierarchy;
+        QTreeWidget* m_hierarchy;
     };
 } // namespace EMStudio
-
-
-#endif

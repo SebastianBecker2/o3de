@@ -6,8 +6,7 @@
  *
  */
 
-#ifndef __RENDERGL_STANDARD_MATERIAL_H
-#define __RENDERGL_STANDARD_MATERIAL_H
+#pragma once
 
 #include <AzCore/Math/Transform.h>
 #include <EMotionFX/Source/StandardMaterial.h>
@@ -41,19 +40,16 @@ namespace RenderGL
     protected:
         void UpdateShader();
 
-        bool                            mAttributes[NUM_ATTRIBUTES];
-        bool                            mAttributesUpdated;
+        bool                            m_attributes[NUM_ATTRIBUTES];
+        bool                            m_attributesUpdated;
 
-        GLSLShader*                     mActiveShader;
-        MCore::Array<GLSLShader*>       mShaders;
-        AZ::Matrix4x4                   mBoneMatrices[200];
-        EMotionFX::Material*            mMaterial;
+        GLSLShader*                     m_activeShader;
+        AZStd::vector<GLSLShader*>       m_shaders;
+        AZ::Matrix4x4                   m_boneMatrices[200];
+        EMotionFX::Material*            m_material;
 
-        Texture*                        mDiffuseMap;
-        Texture*                        mSpecularMap;
-        Texture*                        mNormalMap;
+        Texture*                        m_diffuseMap;
+        Texture*                        m_specularMap;
+        Texture*                        m_normalMap;
     };
 } // namespace RenderGL
-
-
-#endif

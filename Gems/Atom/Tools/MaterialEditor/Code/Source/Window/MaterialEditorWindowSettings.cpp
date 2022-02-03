@@ -6,9 +6,9 @@
  *
  */
 
-#include <Atom/Window/MaterialEditorWindowSettings.h>
 #include <AzCore/RTTI/BehaviorContext.h>
 #include <AzCore/Serialization/EditContext.h>
+#include <Window/MaterialEditorWindowSettings.h>
 
 namespace MaterialEditor
 {
@@ -37,7 +37,7 @@ namespace MaterialEditor
             behaviorContext->Class<MaterialEditorWindowSettings>("MaterialEditorWindowSettings")
                 ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
                 ->Attribute(AZ::Script::Attributes::Category, "Editor")
-                ->Attribute(AZ::Script::Attributes::Module, "render")
+                ->Attribute(AZ::Script::Attributes::Module, "materialeditor")
                 ->Constructor()
                 ->Constructor<const MaterialEditorWindowSettings&>()
                 ;

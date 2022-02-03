@@ -8,7 +8,6 @@
 
 #include "OpenGLRenderPlugin.h"
 #include "GLWidget.h"
-#include "../../../../EMStudioSDK/Source/EMStudioCore.h"
 #include "../../../../EMStudioSDK/Source/MainWindow.h"
 #include "../../../../EMStudioSDK/Source/RenderPlugin/RenderViewWidget.h"
 
@@ -25,13 +24,13 @@ namespace EMStudio
     OpenGLRenderPlugin::OpenGLRenderPlugin()
         : EMStudio::RenderPlugin()
     {
-        mGraphicsManager = nullptr;
+        m_graphicsManager = nullptr;
     }
 
     OpenGLRenderPlugin::~OpenGLRenderPlugin()
     {
         // get rid of the OpenGL graphics manager
-        delete mGraphicsManager;
+        delete m_graphicsManager;
     }
 
     // init after the parent dock window has been created
@@ -48,7 +47,7 @@ namespace EMStudio
     // initialize the OpenGL engine
     bool OpenGLRenderPlugin::InitializeGraphicsManager()
     {
-        if (mGraphicsManager)
+        if (m_graphicsManager)
         {
             // initialize all already existing actors and actor instances
             ReInit();
@@ -59,15 +58,15 @@ namespace EMStudio
         const auto shaderPath = AZ::IO::Path(MysticQt::GetDataDir()) / "Shaders";
 
         // create graphics manager and initialize it
-        mGraphicsManager = new RenderGL::GraphicsManager();
-        if (mGraphicsManager->Init(shaderPath) == false)
+        m_graphicsManager = new RenderGL::GraphicsManager();
+        if (m_graphicsManager->Init(shaderPath) == false)
         {
             MCore::LogError("Could not initialize OpenGL graphics manager.");
             return false;
         }
 
         // set the render util in the base render plugin
-        mRenderUtil = mGraphicsManager->GetRenderUtil();
+        m_renderUtil = m_graphicsManager->GetRenderUtil();
 
         // initialize all already existing actors and actor instances
         ReInit();

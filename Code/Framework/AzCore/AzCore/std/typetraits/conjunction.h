@@ -7,7 +7,9 @@
  */
 #pragma once
 
+#include <AzCore/std/typetraits/typetraits.h>
 #include <AzCore/std/typetraits/conditional.h>
+#include <AzCore/std/typetraits/integral_constant.h> // for true_type
 
 namespace AZStd
 {

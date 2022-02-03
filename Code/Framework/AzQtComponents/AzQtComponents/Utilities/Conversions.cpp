@@ -39,23 +39,32 @@ namespace AzQtComponents
         return AZ::Color(static_cast<float>(rgb.redF()), static_cast<float>(rgb.greenF()), static_cast<float>(rgb.blueF()), static_cast<float>(rgb.alphaF()));
     }
 
-    QString toString(double value, int numDecimals, const QLocale& locale, bool showGroupSeparator)
+    QString toString(double value, int numDecimals, const QLocale& locale, bool showGroupSeparator, bool round)
     {
         const QChar decimalPoint = locale.decimalPoint();
         const QChar zeroDigit = locale.zeroDigit();
+        const int numToStringDecimals = AZStd::max(numDecimals, 20);
+        QString retValue;
 
-        // We want to truncate, not round. toString will round, so we add an extra decimal place to the formatting
-        // so we can remove the last value
-        QString retValue = locale.toString(value, 'f', (numDecimals > 0) ? numDecimals + 1 : 0);
+        // If we want to truncate, not round, we add extra decimal places to the formatting
+        // so we can remove the last values otherwise we allow rounding
+        if (round)
+        {
+            retValue = locale.toString(value, 'f', (numDecimals > 0) ? numDecimals : 0);
+        }
+        else
+        {
+            retValue = locale.toString(value, 'f', (numDecimals > 0) ? numToStringDecimals : 0);
+        }
 
         // Handle special cases when we have decimals in our value
         if (numDecimals > 0)
         {
-            // Truncate the extra digit now, if it's still there
+            // Truncate the extra digits now, if they're still there
             int decimalPointIndex = retValue.lastIndexOf(decimalPoint);
-            if ((decimalPointIndex > 0) && (retValue.size() - (decimalPointIndex + 1)) == (numDecimals + 1))
+            if ((decimalPointIndex > 0) && (retValue.size() - (decimalPointIndex + 1)) == numToStringDecimals)
             {
-                retValue.resize(retValue.size() - 1);
+                retValue.resize(retValue.size() - (numToStringDecimals - numDecimals));
             }
 
             // Remove trailing zeros, since the locale conversion won't do

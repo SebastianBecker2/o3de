@@ -58,7 +58,6 @@
 
 #include <GraphCanvas/Types/ConstructPresets.h>
 #include <GraphCanvas/Types/EntitySaveData.h>
-#include <GraphCanvas/Types/TranslationTypes.h>
 
 #include <GraphCanvas/Widgets/GraphCanvasEditor/GraphCanvasAssetEditorMainWindow.h>
 #include <GraphCanvas/Widgets/GraphCanvasMimeEvent.h>
@@ -140,7 +139,6 @@ namespace GraphCanvas
             Styling::DefaultSelector::Reflect(serializeContext);
             Styling::CompoundSelector::Reflect(serializeContext);
             Styling::NestedSelector::Reflect(serializeContext);
-            TranslationKeyedString::Reflect(serializeContext);
             Styling::Style::Reflect(serializeContext);
             AssetEditorUserSettings::Reflect(serializeContext);
         }
@@ -191,7 +189,6 @@ namespace GraphCanvas
 
     void GraphCanvasSystemComponent::Activate()
     {
-        RegisterAssetHandler();
         RegisterTranslationBuilder();
 
         AzFramework::AssetCatalogEventBus::Handler::BusConnect();
@@ -219,6 +216,9 @@ namespace GraphCanvas
 
             AzToolsFramework::ToolsAssetSystemBus::Broadcast(&AzToolsFramework::ToolsAssetSystemRequests::RegisterSourceAssetType, azrtti_typeid<TranslationAsset>(), TranslationAsset::GetFileFilter());
             m_translationAssetWorker.Activate();
+
+            m_assetHandler = AZStd::make_unique<TranslationAssetHandler>();
+            m_assetHandler->Register();
         }
     }
 
@@ -227,7 +227,6 @@ namespace GraphCanvas
         AzFramework::AssetCatalogEventBus::Handler::BusDisconnect();
         Styling::PseudoElementFactoryRequestBus::Handler::BusDisconnect();
         GraphCanvasRequestBus::Handler::BusDisconnect();
-        AZ::Data::AssetBus::MultiHandler::BusDisconnect();
 
         m_translationAssetWorker.Deactivate();
         UnregisterAssetHandler();
@@ -369,49 +368,35 @@ namespace GraphCanvas
 
     void GraphCanvasSystemComponent::OnCatalogLoaded(const char* /*catalogFile*/)
     {
-        auto postEnumerateCb = [this]()
-        {
-            PopulateTranslationDatabase();
-        };
-
-        // Find any TranslationAsset files that may have translation database key/values
-        AZ::Data::AssetCatalogRequests::AssetEnumerationCB collectAssetsCb = [this](const AZ::Data::AssetId assetId, const AZ::Data::AssetInfo& assetInfo)
-        {
-            const auto assetType = azrtti_typeid<TranslationAsset>();
-            if (assetInfo.m_assetType == assetType)
-            {
-                m_translationAssets.push_back(assetId);
-            }
-        };
-        AZ::Data::AssetCatalogRequestBus::Broadcast(&AZ::Data::AssetCatalogRequestBus::Events::EnumerateAssets, nullptr, collectAssetsCb, postEnumerateCb);
+        GraphCanvas::TranslationRequestBus::Broadcast(&GraphCanvas::TranslationRequests::Restore);
     }
 
-    void GraphCanvasSystemComponent::RegisterAssetHandler()
+    void GraphCanvasSystemComponent::OnCatalogAssetRemoved(const AZ::Data::AssetId& /*assetId*/, const AZ::Data::AssetInfo& assetInfo)
     {
-        AZ::Data::AssetType assetType(azrtti_typeid<TranslationAsset>());
-        if (AZ::Data::AssetManager::Instance().GetHandler(assetType))
+        if (assetInfo.m_assetType == azrtti_typeid<TranslationAsset>())
         {
-            return; // Asset Type already handled
+            GraphCanvas::TranslationRequestBus::Broadcast(&GraphCanvas::TranslationRequests::Restore);
         }
+    }
 
-        auto* catalogBus = AZ::Data::AssetCatalogRequestBus::FindFirstHandler();
-        if (catalogBus)
+    void GraphCanvasSystemComponent::OnCatalogAssetAdded(const AZ::Data::AssetId& assetId)
+    {
+        ReloadDatabase(assetId);
+    }
+
+    void GraphCanvasSystemComponent::OnCatalogAssetChanged(const AZ::Data::AssetId& assetId)
+    {
+        ReloadDatabase(assetId);
+    }
+
+    void GraphCanvasSystemComponent::ReloadDatabase(const AZ::Data::AssetId& assetId)
+    {
+        AZ::Data::AssetInfo assetInfo;
+        AZ::Data::AssetCatalogRequestBus::BroadcastResult(assetInfo, &AZ::Data::AssetCatalogRequestBus::Events::GetAssetInfoById, assetId);
+        if (assetInfo.m_assetType == azrtti_typeid<TranslationAsset>())
         {
-            // Register asset types the asset DB should query our catalog for.
-            catalogBus->AddAssetType(assetType);
-
-            // Build the catalog (scan).
-            catalogBus->AddExtension(".names");
+            GraphCanvas::TranslationRequestBus::Broadcast(&GraphCanvas::TranslationRequests::Restore);
         }
-
-        m_assetHandler = AZStd::make_unique<TranslationAssetHandler>();
-        AZ::Data::AssetManager::Instance().RegisterHandler(m_assetHandler.get(), assetType);
-
-        // Use AssetCatalog service to register ScriptEvent asset type and extension
-        AZ::Data::AssetCatalogRequestBus::Broadcast(&AZ::Data::AssetCatalogRequests::AddAssetType, assetType);
-        AZ::Data::AssetCatalogRequestBus::Broadcast(&AZ::Data::AssetCatalogRequests::EnableCatalogForAsset, assetType);
-        AZ::Data::AssetCatalogRequestBus::Broadcast(&AZ::Data::AssetCatalogRequests::AddExtension, TranslationAsset::GetFileFilter());
-
     }
 
     void GraphCanvasSystemComponent::UnregisterAssetHandler()
@@ -420,21 +405,6 @@ namespace GraphCanvas
         {
             AZ::Data::AssetManager::Instance().UnregisterHandler(m_assetHandler.get());
             m_assetHandler.reset();
-        }
-
-        for (const AZ::Data::AssetId& assetId : m_translationAssets)
-        {
-            AZ::Data::AssetBus::MultiHandler::BusDisconnect(assetId);
-        }
-        m_translationAssets.clear();
-    }
-
-    void GraphCanvasSystemComponent::PopulateTranslationDatabase()
-    {
-        for (const AZ::Data::AssetId& assetId : m_translationAssets)
-        {
-            AZ::Data::AssetBus::MultiHandler::BusConnect(assetId);
-            AZ::Data::AssetManager::Instance().GetAsset<TranslationAsset>(assetId, AZ::Data::AssetLoadBehavior::Default);
         }
     }
 }

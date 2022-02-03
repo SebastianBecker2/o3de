@@ -335,6 +335,11 @@ namespace ScriptCanvas
         return &m_datum;
     }
 
+    Datum& GraphVariable::ModDatum()
+    {
+        return m_datum;
+    }
+
     void GraphVariable::ConfigureDatumView(ModifiableDatumView& datumView)
     {
         datumView.ConfigureView((*this));
@@ -348,22 +353,11 @@ namespace ScriptCanvas
     void GraphVariable::SetVariableName(AZStd::string_view variableName)
     {
         m_variableName = variableName;
-        SetDisplayName(variableName);
     }
 
     AZStd::string_view GraphVariable::GetVariableName() const
     {
         return m_variableName;
-    }
-
-    void GraphVariable::SetDisplayName(const AZStd::string& displayName)
-    {
-        m_datum.SetLabel(displayName);
-    }
-
-    AZStd::string_view GraphVariable::GetDisplayName() const
-    {
-        return m_datum.GetLabel();
     }
 
     void GraphVariable::SetScriptInputControlVisibility(const AZ::Crc32& inputControlVisibility)
@@ -502,14 +496,6 @@ namespace ScriptCanvas
     int GraphVariable::GetSortPriority() const
     {
         return m_sortPriority;
-    }
-
-    bool GraphVariable::IsInFunction() const
-    {
-        AZ::Data::AssetType assetType = AZ::Data::AssetType::CreateNull();
-        ScriptCanvas::GraphRequestBus::EventResult(assetType, m_scriptCanvasId, &ScriptCanvas::GraphRequests::GetAssetType);
-
-        return assetType == azrtti_typeid<ScriptCanvas::SubgraphInterfaceAsset>();
     }
 
     AZ::u32 GraphVariable::OnInitialValueSourceChanged()

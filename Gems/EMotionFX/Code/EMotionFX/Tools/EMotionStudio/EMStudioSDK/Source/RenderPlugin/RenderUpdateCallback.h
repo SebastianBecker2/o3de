@@ -6,8 +6,7 @@
  *
  */
 
-#ifndef __EMSTUDIO_RENDERUPDATECALLBACK_H
-#define __EMSTUDIO_RENDERUPDATECALLBACK_H
+#pragma once
 
 #include "../EMStudioConfig.h"
 #include <EMotionFX/Source/ActorInstance.h>
@@ -34,10 +33,7 @@ namespace EMStudio
         void SetEnableRendering(bool renderingEnabled);
 
     protected:
-        bool            mEnableRendering;
-        RenderPlugin*   mPlugin;
+        bool            m_enableRendering;
+        RenderPlugin*   m_plugin;
     };
 } // namespace EMStudio
-
-
-#endif

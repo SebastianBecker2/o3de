@@ -6,10 +6,9 @@
 #
 #
 
-ly_get_list_relative_pal_filename(core_pal_dir ${CMAKE_CURRENT_LIST_DIR}/Platform/${PAL_PLATFORM_NAME})
-
-ly_get_list_relative_pal_filename(editor_pal_dir ${CMAKE_CURRENT_LIST_DIR}/Editor/Platform/${PAL_PLATFORM_NAME})
-ly_get_list_relative_pal_filename(editor_common_dir ${CMAKE_CURRENT_LIST_DIR}/Editor/Platform/Common)
+o3de_pal_dir(core_pal_dir ${CMAKE_CURRENT_LIST_DIR}/Platform/${PAL_PLATFORM_NAME} ${gem_restricted_path} ${gem_path} ${gem_parent_relative_path})
+o3de_pal_dir(editor_pal_dir ${CMAKE_CURRENT_LIST_DIR}/Editor/Platform/${PAL_PLATFORM_NAME} ${gem_restricted_path} ${gem_path} ${gem_parent_relative_path})
+set(editor_common_dir ${CMAKE_CURRENT_LIST_DIR}/Editor/Platform/Common)
 
 ly_add_target(
     NAME EMotionFXStaticLib STATIC
@@ -36,6 +35,7 @@ ly_add_target(
         PUBLIC
             AZ::AtomCore
             Gem::Atom_RPI.Public
+            Gem::AtomLyIntegration_CommonFeatures.Static
             Gem::LmbrCentral
     COMPILE_DEFINITIONS
         PUBLIC
@@ -108,6 +108,8 @@ if (PAL_TRAIT_BUILD_HOST_TOOLS)
                 AZ::AzToolsFramework
                 Legacy::Editor.Headers
                 3rdParty::OpenGLInterface
+                Gem::AtomToolsFramework.Static
+                Gem::AtomToolsFramework.Editor
         COMPILE_DEFINITIONS
             PUBLIC
                 EMFX_EMSTUDIOLYEMBEDDED
@@ -219,8 +221,6 @@ if(PAL_TRAIT_BUILD_TESTS_SUPPORTED)
             ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/AnimGraphExampleNoDependency.animgraph
             ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/EmptyAnimGraphExample.animgraph
             ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/EmptyMotionSetExample.motionset
-            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/LegacyAnimGraphExample.animgraph
-            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/LegacyMotionSetExample.motionset
             ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/MotionSetExample.motionset
             ${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestAssets/EMotionFXBuilderTestAssets/MotionSetExampleNoDependency.motionset
         OUTPUT_SUBDIRECTORY

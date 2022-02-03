@@ -6,8 +6,7 @@
  *
  */
 
-#ifndef __RENDERGL_INDEXBUFFER_H
-#define __RENDERGL_INDEXBUFFER_H
+#pragma once
 
 #include "VertexBuffer.h"
 
@@ -35,8 +34,8 @@ namespace RenderGL
 
         void Activate();
 
-        MCORE_INLINE uint32 GetBufferID() const         { return mBufferID; }
-        MCORE_INLINE uint32 GetNumIndices() const       { return mNumIndices; }
+        MCORE_INLINE uint32 GetBufferID() const         { return m_bufferId; }
+        MCORE_INLINE uint32 GetNumIndices() const       { return m_numIndices; }
 
         bool Init(EIndexSize indexSize, uint32 numIndices, EUsageMode usage, void* indexData = nullptr);
 
@@ -44,13 +43,11 @@ namespace RenderGL
         void Unlock();
 
     private:
-        uint32      mBufferID;      // the buffer ID
-        uint32      mNumIndices;    // the number of indices
+        uint32      m_bufferId;      // the buffer ID
+        uint32      m_numIndices;    // the number of indices
 
         // helpers
         bool GetIsSuccess();
         bool GetHasError();
     };
-}
-
-#endif
+} // namespace RenderGL

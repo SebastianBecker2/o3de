@@ -49,11 +49,17 @@ namespace AZ
 
             //! Returns the model-space axis aligned bounding box
             const AZ::Aabb& GetAabb() const;
+            
+            //! Returns the list of all ModelMaterialSlot's for the model, across all LODs.
+            const ModelMaterialSlotMap& GetMaterialSlots() const;
+            
+            //! Find a material slot with the given stableId, or returns an invalid slot if it isn't found.
+            const ModelMaterialSlot& FindMaterialSlot(uint32_t stableId) const;
 
             //! Returns the number of Lods in the model
             size_t GetLodCount() const;
 
-            AZStd::array_view<Data::Asset<ModelLodAsset>> GetLodAssets() const;
+            AZStd::span<const Data::Asset<ModelLodAsset>> GetLodAssets() const;
 
             //! Checks a ray for intersection against this model. The ray must be in the same coordinate space as the model.
             //! Important: only to be used in the Editor, it may kick off a job to calculate spatial information.
@@ -71,6 +77,12 @@ namespace AZ
                 float& distanceNormalized, AZ::Vector3& normal) const;
 
         private:
+            // AssetData overrides...
+            bool HandleAutoReload() override
+            {
+                return false;
+            }
+
             void SetReady();
 
             AZ::Name m_name;
@@ -97,6 +109,13 @@ namespace AZ
             volatile mutable bool m_isKdTreeCalculationRunning = false;
             mutable AZStd::mutex m_kdTreeLock;
             mutable AZStd::optional<AZStd::size_t> m_modelTriangleCount;
+            
+            // Lists all of the material slots that are used by this LOD.
+            // Note the same slot can appear in multiple LODs in the model, so that LODs don't have to refer back to the model asset.
+            ModelMaterialSlotMap m_materialSlots;
+
+            // A default ModelMaterialSlot to be returned upon error conditions.
+            ModelMaterialSlot m_fallbackSlot;
 
             AZStd::size_t CalculateTriangleCount() const;
         };

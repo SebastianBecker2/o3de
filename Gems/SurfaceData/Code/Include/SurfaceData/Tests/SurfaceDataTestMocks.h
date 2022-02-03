@@ -8,14 +8,15 @@
 #pragma once
 
 #include <AzTest/AzTest.h>
-#include <AzCore/std/hash.h>
+
+#include <AzCore/Casting/lossy_cast.h>
 #include <AzCore/Component/Entity.h>
 #include <AzCore/Component/ComponentApplication.h>
 #include <AzCore/Component/TransformBus.h>
+#include <AzCore/std/hash.h>
 
 #include <LmbrCentral/Shape/ShapeComponentBus.h>
 #include <SurfaceData/SurfaceDataSystemRequestBus.h>
-#include <AzCore/Casting/lossy_cast.h>
 
 namespace UnitTest
 {
@@ -23,23 +24,6 @@ namespace UnitTest
         : public ::testing::Test
     {
     protected:
-        AZ::ComponentApplication m_app;
-        AZ::Entity* m_systemEntity = nullptr;
-
-        void SetUp() override
-        {
-            AZ::ComponentApplication::Descriptor appDesc;
-            appDesc.m_memoryBlocksByteSize = 128 * 1024 * 1024;
-            m_systemEntity = m_app.Create(appDesc);
-            m_app.AddEntity(m_systemEntity);
-        }
-
-        void TearDown() override
-        {
-            m_app.Destroy();
-            m_systemEntity = nullptr;
-        }
-
         AZStd::unique_ptr<AZ::Entity> CreateEntity()
         {
             return AZStd::make_unique<AZ::Entity>();
@@ -57,14 +41,12 @@ namespace UnitTest
         template <typename Component, typename Configuration>
         AZ::Component* CreateComponent(AZ::Entity* entity, const Configuration& config)
         {
-            m_app.RegisterComponentDescriptor(Component::CreateDescriptor());
             return entity->CreateComponent<Component>(config);
         }
 
         template <typename Component>
         AZ::Component* CreateComponent(AZ::Entity* entity)
         {
-            m_app.RegisterComponentDescriptor(Component::CreateDescriptor());
             return entity->CreateComponent<Component>();
         }
     };
@@ -126,6 +108,29 @@ namespace UnitTest
         static void GetProvidedServices(AZ::ComponentDescriptor::DependencyArrayType& provided)
         {
             provided.push_back(AZ_CRC("ShapeService", 0xe86aa5fe));
+        }
+    };
+
+    // Mock out a generic Physics Collider Component, which is a required dependency for adding a SurfaceDataColliderComponent.
+    struct MockPhysicsColliderComponent : public AZ::Component
+    {
+    public:
+        AZ_COMPONENT(MockPhysicsColliderComponent, "{4F7C36DE-6475-4E0A-96A7-BFAF21C07C95}", AZ::Component);
+
+        void Activate() override
+        {
+        }
+        void Deactivate() override
+        {
+        }
+
+        static void Reflect(AZ::ReflectContext* reflect)
+        {
+            AZ_UNUSED(reflect);
+        }
+        static void GetProvidedServices(AZ::ComponentDescriptor::DependencyArrayType& provided)
+        {
+            provided.push_back(AZ_CRC("PhysXColliderService", 0x4ff43f7c));
         }
     };
 
@@ -200,7 +205,14 @@ namespace UnitTest
         }
 
         void GetSurfacePointsFromRegion([[maybe_unused]] const AZ::Aabb& inRegion, [[maybe_unused]] const AZ::Vector2 stepSize, [[maybe_unused]] const SurfaceData::SurfaceTagVector& desiredTags,
-            [[maybe_unused]] SurfaceData::SurfacePointListPerPosition& surfacePointListPerPosition) const override
+            [[maybe_unused]] SurfaceData::SurfacePointLists& surfacePointListPerPosition) const override
+        {
+        }
+
+        void GetSurfacePointsFromList(
+            [[maybe_unused]] AZStd::span<const AZ::Vector3> inPositions,
+            [[maybe_unused]] const SurfaceData::SurfaceTagVector& desiredTags,
+            [[maybe_unused]] SurfaceData::SurfacePointLists& surfacePointLists) const override
         {
         }
 
@@ -265,7 +277,7 @@ namespace UnitTest
         {
             // Keep a list of registered entries.  Use the "list index + 1" as the handle.  (We add +1 because 0 is used to mean "invalid handle")
             entryList.emplace_back(entry);
-            return entryList.size();
+            return static_cast<SurfaceData::SurfaceDataRegistryHandle>(entryList.size());
         }
 
         void UnregisterEntry(const SurfaceData::SurfaceDataRegistryHandle& handle, AZStd::vector<SurfaceData::SurfaceDataRegistryEntry>& entryList)
@@ -293,7 +305,7 @@ namespace UnitTest
         SurfaceData::SurfaceDataRegistryHandle GetEntryHandle(AZ::EntityId id, const AZStd::vector<SurfaceData::SurfaceDataRegistryEntry>& entryList)
         {
             // Look up the requested entity Id and see if we have a registered surface entry with that handle.  If so, return the handle.
-            auto result = AZStd::find_if(entryList.begin(), entryList.end(), [this, id](const SurfaceData::SurfaceDataRegistryEntry& entry) { return entry.m_entityId == id; });
+            auto result = AZStd::find_if(entryList.begin(), entryList.end(), [id](const SurfaceData::SurfaceDataRegistryEntry& entry) { return entry.m_entityId == id; });
             if (result == entryList.end())
             {
                 return SurfaceData::InvalidSurfaceDataRegistryHandle;

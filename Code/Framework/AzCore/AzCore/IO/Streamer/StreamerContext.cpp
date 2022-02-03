@@ -17,9 +17,13 @@ namespace AZ
     namespace IO
     {
         static constexpr char ContextName[] = "Context";
+#if AZ_STREAMER_ADD_EXTRA_PROFILING_INFO
         static constexpr char PredictionAccuracyName[] = "Prediction accuracy (ms)";
         static constexpr char LatePredictionName[] = "Early completions";
         static constexpr char MissedDeadlinesName[] = "Missed deadlines";
+#endif // AZ_STREAMER_ADD_EXTRA_PROFILING_INFO
+
+        StreamerContext::StreamerContext() = default;
 
         StreamerContext::~StreamerContext()
         {
@@ -153,7 +157,7 @@ namespace AZ
 
         bool StreamerContext::FinalizeCompletedRequests()
         {
-            AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::AzCore);
+            AZ_PROFILE_FUNCTION(AzCore);
 
 #if AZ_STREAMER_ADD_EXTRA_PROFILING_INFO
             auto now = AZStd::chrono::system_clock::now();
@@ -203,7 +207,7 @@ namespace AZ
                                 m_latePredictionsPercentageStat.GetMostRecentSample());
                         }
                     }
-                    auto readRequest = AZStd::get_if<FileRequest::ReadRequestData>(&top->GetCommand());
+                    auto readRequest = AZStd::get_if<Requests::ReadRequestData>(&top->GetCommand());
                     if (readRequest != nullptr)
                     {
                         m_missedDeadlinePercentageStat.PushSample(now < readRequest->m_deadline ? 0.0 : 1.0);
@@ -218,12 +222,12 @@ namespace AZ
                     bool isInternal = top->m_usage == FileRequest::Usage::Internal;
 
                     {
-                        AZ_PROFILE_SCOPE_STALL(AZ::Debug::ProfileCategory::AzCore,
+                        AZ_PROFILE_SCOPE(AzCore,
                             isInternal ? "Completion callback internal" : "Completion callback external");
                         top->m_onCompletion(*top);
-                        AZ_PROFILE_INTERVAL_END(AZ::Debug::ProfileCategory::AzCore, top);
+                        AZ_PROFILE_INTERVAL_END(AzCore, top);
                     }
-                    
+
                     if (parent)
                     {
                         AZ_Assert(parent->m_dependencies > 0,

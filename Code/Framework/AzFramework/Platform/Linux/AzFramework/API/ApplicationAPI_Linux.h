@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <AzCore/Interface/Interface.h>
 #include <AzCore/EBus/EBus.h>
 
 namespace AzFramework

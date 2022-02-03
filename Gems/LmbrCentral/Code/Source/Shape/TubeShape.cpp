@@ -328,18 +328,19 @@ namespace LmbrCentral
                 sides, capSegments, vertices);
         }
     }
-
-    /// Generates vertices and indices for a tube shape
-    /// Split into two stages:
-    /// - Generate vertex positions
-    /// - Generate indices (faces)
-    /// Heres a rough diagram of how it is built:
-    ///   ____________
-    ///  /_|__|__|__|_\
-    ///  \_|__|__|__|_/
-    ///  - A single vertex at each end of the tube
-    ///  - Angled end cap segments
-    ///  - Middle segments
+    /*
+        Generates vertices and indices for a tube shape
+        Split into two stages:
+        - Generate vertex positions
+        - Generate indices (faces)
+          Heres a rough diagram of how it is built:
+           ____________
+          /_|__|__|__|_\
+          \_|__|__|__|_/
+         - A single vertex at each end of the tube
+         - Angled end cap segments
+         - Middle segments
+    */
     void GenerateSolidTubeMesh(
         const AZ::SplinePtr& spline, const SplineAttribute<float>& variableRadius,
         const float radius, const AZ::u32 capSegments, const AZ::u32 sides,
@@ -355,7 +356,7 @@ namespace LmbrCentral
             return;
         }
 
-        const AZ::u32 segments = segmentCount * spline->GetSegmentGranularity() + segmentCount - 1;
+        const AZ::u32 segments = static_cast<AZ::u32>(segmentCount * spline->GetSegmentGranularity() + segmentCount - 1);
         const AZ::u32 totalSegments = segments + capSegments * 2;
         const AZ::u32 capSegmentTipVerts = capSegments > 0 ? 2 : 0;
         const size_t numVerts = sides * (totalSegments + 1) + capSegmentTipVerts;
@@ -401,7 +402,7 @@ namespace LmbrCentral
         // 2 verts for each segment
         //  loops == sides
         //   2 loops per segment
-        const AZ::u32 segments = segmentCount * spline->GetSegmentGranularity();
+        const AZ::u32 segments = static_cast<AZ::u32>(segmentCount * spline->GetSegmentGranularity());
         const AZ::u32 totalEndSegments = capSegments * 2 * 2 * 2 * 2;
         const AZ::u32 totalSegments = segments * 2 * 2 * 2;
         const AZ::u32 totalLoops = 2 * sides * segments * 2;
@@ -594,7 +595,7 @@ namespace LmbrCentral
         // to ensure the total radius stays positive
         if (GetTotalRadius(AZ::SplineAddress(vertIndex)) < 0.0f)
         {
-            SetVariableRadius(vertIndex, -GetRadius());
+            SetVariableRadius(static_cast<int>(vertIndex), -GetRadius());
         }
     }
 

@@ -6,15 +6,20 @@
  *
  */
 
-#include <AzCore/Casting/numeric_cast.h>
 #include <AzCore/IO/Streamer/Scheduler.h>
+
+#include <AzCore/Casting/numeric_cast.h>
+#include <AzCore/Debug/Profiler.h>
+#include <AzCore/IO/Streamer/FileRequest.h>
 #include <AzCore/std/containers/deque.h>
 #include <AzCore/std/sort.h>
 
 namespace AZ::IO
 {
+#if AZ_STREAMER_ADD_EXTRA_PROFILING_INFO
     static constexpr char SchedulerName[] = "Scheduler";
     static constexpr char ImmediateReadsName[] = "Immediate reads";
+#endif // AZ_STREAMER_ADD_EXTRA_PROFILING_INFO
 
     Scheduler::Scheduler(AZStd::shared_ptr<StreamStackEntry> streamStack, u64 memoryAlignment, u64 sizeAlignment, u64 granularity)
     {
@@ -32,6 +37,8 @@ namespace AZ::IO
         m_threadData.m_streamStack = AZStd::move(streamStack);
     }
 
+    Scheduler::~Scheduler() = default;
+
     void Scheduler::Start(const AZStd::thread_desc& threadDesc)
     {
         if (!m_isRunning)
@@ -40,10 +47,12 @@ namespace AZ::IO
 
             m_mainLoopDesc = threadDesc;
             m_mainLoopDesc.m_name = "IO Scheduler";
-            m_mainLoop = AZStd::thread([this]()
-            {
-                Thread_MainLoop();
-            }, &m_mainLoopDesc);
+            m_mainLoop = AZStd::thread(
+                m_mainLoopDesc,
+                [this]()
+                {
+                    Thread_MainLoop();
+                });
         }
     }
 
@@ -138,14 +147,14 @@ namespace AZ::IO
         while (m_isRunning)
         {
             {
-                AZ_PROFILE_SCOPE_IDLE(AZ::Debug::ProfileCategory::AzCore, "Scheduler suspended.");
+                AZ_PROFILE_SCOPE(AzCore, "Scheduler suspended.");
                 m_context.SuspendSchedulingThread();
             }
 
             // Only do processing if the thread hasn't been suspended.
             while (!m_isSuspended)
             {
-                AZ_PROFILE_SCOPE(AZ::Debug::ProfileCategory::AzCore, "Scheduler main loop.");
+                AZ_PROFILE_SCOPE(AzCore, "Scheduler main loop.");
 
                 // Always schedule requests first as the main Streamer thread could have been asleep for a long time due to slow reading
                 // but also don't schedule after every change in the queue as scheduling is not cheap.
@@ -154,7 +163,7 @@ namespace AZ::IO
                 {
                     do
                     {
-                        AZ_PROFILE_SCOPE(AZ::Debug::ProfileCategory::AzCore, "Scheduler queue requests.");
+                        AZ_PROFILE_SCOPE(AzCore, "Scheduler queue requests.");
                         // If there are pending requests and available slots, queue the next requests.
                         while(m_context.GetNumPreparedRequests() > 0)
                         {
@@ -208,7 +217,7 @@ namespace AZ::IO
 
     void Scheduler::Thread_QueueNextRequest()
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::AzCore);
+        AZ_PROFILE_FUNCTION(AzCore);
 
         FileRequest* next = m_context.PopPreparedRequest();
         next->SetStatus(IStreamerTypes::RequestStatus::Processing);
@@ -217,19 +226,19 @@ namespace AZ::IO
         {
             using Command = AZStd::decay_t<decltype(args)>;
             if constexpr (
-                AZStd::is_same_v<Command, FileRequest::ReadData> ||
-                AZStd::is_same_v<Command, FileRequest::CompressedReadData>)
+                AZStd::is_same_v<Command, Requests::ReadData> ||
+                AZStd::is_same_v<Command, Requests::CompressedReadData>)
             {
-                auto parentReadRequest = next->GetCommandFromChain<FileRequest::ReadRequestData>();
+                auto parentReadRequest = next->GetCommandFromChain<Requests::ReadRequestData>();
                 AZ_Assert(parentReadRequest != nullptr, "The issued read request can't be found for the (compressed) read command.");
-                
+
                 size_t size = parentReadRequest->m_size;
                 if (parentReadRequest->m_output == nullptr)
                 {
                     AZ_Assert(parentReadRequest->m_allocator,
                         "The read request was issued without a memory allocator or valid output address.");
                     u64 recommendedSize = size;
-                    if constexpr (AZStd::is_same_v<Command, FileRequest::ReadData>)
+                    if constexpr (AZStd::is_same_v<Command, Requests::ReadData>)
                     {
                         recommendedSize = m_recommendations.CalculateRecommendedMemorySize(size, parentReadRequest->m_offset);
                     }
@@ -244,12 +253,12 @@ namespace AZ::IO
                     parentReadRequest->m_output = allocation.m_address;
                     parentReadRequest->m_outputSize = allocation.m_size;
                     parentReadRequest->m_memoryType = allocation.m_type;
-                    if constexpr (AZStd::is_same_v<Command, FileRequest::ReadData>)
+                    if constexpr (AZStd::is_same_v<Command, Requests::ReadData>)
                     {
                         args.m_output = parentReadRequest->m_output;
                         args.m_outputSize = allocation.m_size;
                     }
-                    else if constexpr (AZStd::is_same_v<Command, FileRequest::CompressedReadData>)
+                    else if constexpr (AZStd::is_same_v<Command, Requests::CompressedReadData>)
                     {
                         args.m_output = parentReadRequest->m_output;
                     }
@@ -261,8 +270,8 @@ namespace AZ::IO
                     m_processingStartTime = AZStd::chrono::system_clock::now();
                 }
 #endif
-                
-                if constexpr (AZStd::is_same_v<Command, FileRequest::ReadData>)
+
+                if constexpr (AZStd::is_same_v<Command, Requests::ReadData>)
                 {
                     m_threadData.m_lastFilePath = args.m_path;
                     m_threadData.m_lastFileOffset = args.m_offset + args.m_size;
@@ -270,7 +279,7 @@ namespace AZ::IO
                     m_processingSize += args.m_size;
 #endif
                 }
-                else if constexpr (AZStd::is_same_v<Command, FileRequest::CompressedReadData>)
+                else if constexpr (AZStd::is_same_v<Command, Requests::CompressedReadData>)
                 {
                     const CompressionInfo& info = args.m_compressionInfo;
                     m_threadData.m_lastFilePath = info.m_archiveFilename;
@@ -279,21 +288,21 @@ namespace AZ::IO
                     m_processingSize += info.m_uncompressedSize;
 #endif
                 }
-                AZ_PROFILE_INTERVAL_START_COLORED(AZ::Debug::ProfileCategory::AzCore, next, ProfilerColor,
+                AZ_PROFILE_INTERVAL_START_COLORED(AzCore, next, ProfilerColor,
                     "Streamer queued %zu: %s", next->GetCommand().index(), parentReadRequest->m_path.GetRelativePath());
                 m_threadData.m_streamStack->QueueRequest(next);
             }
-            else if constexpr (AZStd::is_same_v<Command, FileRequest::CancelData>)
+            else if constexpr (AZStd::is_same_v<Command, Requests::CancelData>)
             {
                 return Thread_ProcessCancelRequest(next, args);
             }
-            else if constexpr (AZStd::is_same_v<Command, FileRequest::RescheduleData>)
+            else if constexpr (AZStd::is_same_v<Command, Requests::RescheduleData>)
             {
                 return Thread_ProcessRescheduleRequest(next, args);
             }
-            else if constexpr (AZStd::is_same_v<Command, FileRequest::FlushData> || AZStd::is_same_v<Command, FileRequest::FlushAllData>)
+            else if constexpr (AZStd::is_same_v<Command, Requests::FlushData> || AZStd::is_same_v<Command, Requests::FlushAllData>)
             {
-                AZ_PROFILE_INTERVAL_START_COLORED(AZ::Debug::ProfileCategory::AzCore, next, ProfilerColor,
+                AZ_PROFILE_INTERVAL_START_COLORED(AzCore, next, ProfilerColor,
                     "Streamer queued %zu", next->GetCommand().index());
                 // Flushing becomes a lot less complicated if there are no jobs and/or asynchronous I/O running. This does mean overall
                 // longer processing time as bubbles are introduced into the pipeline, but flushing is an infrequent event that only
@@ -303,7 +312,7 @@ namespace AZ::IO
             }
             else
             {
-                AZ_PROFILE_INTERVAL_START_COLORED(AZ::Debug::ProfileCategory::AzCore, next, ProfilerColor,
+                AZ_PROFILE_INTERVAL_START_COLORED(AzCore, next, ProfilerColor,
                     "Streamer queued %zu", next->GetCommand().index());
                 m_threadData.m_streamStack->QueueRequest(next);
             }
@@ -312,13 +321,13 @@ namespace AZ::IO
 
     bool Scheduler::Thread_ExecuteRequests()
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::AzCore);
+        AZ_PROFILE_FUNCTION(AzCore);
         return m_threadData.m_streamStack->ExecuteRequests();
     }
 
     bool Scheduler::Thread_PrepareRequests(AZStd::vector<FileRequestPtr>& outstandingRequests)
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::AzCore);
+        AZ_PROFILE_FUNCTION(AzCore);
 
         {
             AZStd::scoped_lock lock(m_pendingRequestsLock);
@@ -336,11 +345,11 @@ namespace AZ::IO
         AZStd::chrono::system_clock::time_point now = AZStd::chrono::system_clock::now();
         auto visitor = [this, now](auto&& args) -> void
 #else
-        auto visitor = [this](auto&& args) -> void
+        auto visitor = [](auto&& args) -> void
 #endif
         {
             using Command = AZStd::decay_t<decltype(args)>;
-            if constexpr (AZStd::is_same_v<Command, FileRequest::ReadRequestData>)
+            if constexpr (AZStd::is_same_v<Command, Requests::ReadRequestData>)
             {
                 if (args.m_output == nullptr && args.m_allocator != nullptr)
                 {
@@ -372,7 +381,7 @@ namespace AZ::IO
 
     void Scheduler::Thread_ProcessTillIdle()
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::AzCore);
+        AZ_PROFILE_FUNCTION(AzCore);
 
         while (true)
         {
@@ -388,9 +397,9 @@ namespace AZ::IO
         }
     }
 
-    void Scheduler::Thread_ProcessCancelRequest(FileRequest* request, FileRequest::CancelData& data)
+    void Scheduler::Thread_ProcessCancelRequest(FileRequest* request, Requests::CancelData& data)
     {
-        AZ_PROFILE_INTERVAL_START_COLORED(AZ::Debug::ProfileCategory::AzCore, request, ProfilerColor, "Streamer queued cancel");
+        AZ_PROFILE_INTERVAL_START_COLORED(AzCore, request, ProfilerColor, "Streamer queued cancel");
         auto& pending = m_context.GetPreparedRequests();
         auto pendingIt = pending.begin();
         while (pendingIt != pending.end())
@@ -406,20 +415,20 @@ namespace AZ::IO
                 ++pendingIt;
             }
         }
-        
+
         m_threadData.m_streamStack->QueueRequest(request);
     }
 
-    void Scheduler::Thread_ProcessRescheduleRequest(FileRequest* request, FileRequest::RescheduleData& data)
+    void Scheduler::Thread_ProcessRescheduleRequest(FileRequest* request, Requests::RescheduleData& data)
     {
-        AZ_PROFILE_INTERVAL_START_COLORED(AZ::Debug::ProfileCategory::AzCore, request, ProfilerColor, "Streamer queued reschedule");
+        AZ_PROFILE_INTERVAL_START_COLORED(AzCore, request, ProfilerColor, "Streamer queued reschedule");
         auto& pendingRequests = m_context.GetPreparedRequests();
         for (FileRequest* pending : pendingRequests)
         {
             if (pending->WorksOn(data.m_target))
             {
                 // Read requests are the only requests that use deadlines and dynamic priorities.
-                auto readRequest = pending->GetCommandFromChain<FileRequest::ReadRequestData>();
+                auto readRequest = pending->GetCommandFromChain<Requests::ReadRequestData>();
                 if (readRequest)
                 {
                     readRequest->m_deadline = data.m_newDeadline;
@@ -458,8 +467,8 @@ namespace AZ::IO
 
         // Order is the same for both requests, so prioritize the request that are at risk of missing
         // it's deadline.
-        const FileRequest::ReadRequestData* firstRead = first->GetCommandFromChain<FileRequest::ReadRequestData>();
-        const FileRequest::ReadRequestData* secondRead = second->GetCommandFromChain<FileRequest::ReadRequestData>();
+        const Requests::ReadRequestData* firstRead = first->GetCommandFromChain<Requests::ReadRequestData>();
+        const Requests::ReadRequestData* secondRead = second->GetCommandFromChain<Requests::ReadRequestData>();
 
         if (firstRead == nullptr || secondRead == nullptr)
         {
@@ -491,11 +500,11 @@ namespace AZ::IO
         auto sameFile = [this](auto&& args)
         {
             using Command = AZStd::decay_t<decltype(args)>;
-            if constexpr (AZStd::is_same_v<Command, FileRequest::ReadData>)
+            if constexpr (AZStd::is_same_v<Command, Requests::ReadData>)
             {
                 return m_threadData.m_lastFilePath == args.m_path;
             }
-            else if constexpr (AZStd::is_same_v<Command, FileRequest::CompressedReadData>)
+            else if constexpr (AZStd::is_same_v<Command, Requests::CompressedReadData>)
             {
                 return m_threadData.m_lastFilePath == args.m_compressionInfo.m_archiveFilename;
             }
@@ -512,11 +521,11 @@ namespace AZ::IO
             auto offset = [](auto&& args) -> s64
             {
                 using Command = AZStd::decay_t<decltype(args)>;
-                if constexpr (AZStd::is_same_v<Command, FileRequest::ReadData>)
+                if constexpr (AZStd::is_same_v<Command, Requests::ReadData>)
                 {
                     return aznumeric_caster(args.m_offset);
                 }
-                else if constexpr (AZStd::is_same_v<Command, FileRequest::CompressedReadData>)
+                else if constexpr (AZStd::is_same_v<Command, Requests::CompressedReadData>)
                 {
                     return aznumeric_caster(args.m_compressionInfo.m_offset);
                 }
@@ -543,7 +552,7 @@ namespace AZ::IO
 
     void Scheduler::Thread_ScheduleRequests()
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::AzCore);
+        AZ_PROFILE_FUNCTION(AzCore);
 
         AZStd::chrono::system_clock::time_point now = AZStd::chrono::system_clock::now();
         auto& pendingQueue = m_context.GetPreparedRequests();
@@ -554,7 +563,7 @@ namespace AZ::IO
 
         if (m_context.GetNumPreparedRequests() > 1)
         {
-            AZ_PROFILE_SCOPE_DYNAMIC(AZ::Debug::ProfileCategory::AzCore,
+            AZ_PROFILE_SCOPE(AzCore,
                 "Scheduler::Thread_ScheduleRequests - Sorting %i requests", m_context.GetNumPreparedRequests());
             auto sorter = [this](const FileRequest* lhs, const FileRequest* rhs) -> bool
             {

@@ -16,13 +16,8 @@
 #include <ATLControlsModel.h>
 #include <AudioControl.h>
 #include <AudioControlsEditorPlugin.h>
-#include <CryFile.h>
-#include <CryPath.h>
-#include <Cry_Camera.h>
-#include <IAudioSystem.h>
 #include <IAudioSystemControl.h>
 #include <IAudioSystemEditor.h>
-#include <IEditor.h>
 #include <QAudioControlEditorIcons.h>
 
 #include <QWidgetAction>
@@ -172,6 +167,12 @@ namespace AudioControls
         pProxyModel->setSourceModel(m_pTreeModel);
         m_pATLControlsTree->setModel(pProxyModel);
         m_pProxyModel = pProxyModel;
+
+        QAction* pAction = new QAction(tr("Delete"), this);
+        pAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+        pAction->setShortcut(QKeySequence::Delete);
+        connect(pAction, SIGNAL(triggered()), this, SLOT(DeleteSelectedControl()));
+        m_pATLControlsTree->addAction(pAction);
 
         connect(m_pATLControlsTree->selectionModel(), SIGNAL(selectionChanged(const QItemSelection&, const QItemSelection&)), this, SIGNAL(SelectedControlChanged()));
         connect(m_pATLControlsTree->selectionModel(), SIGNAL(currentChanged(const QModelIndex&, const QModelIndex&)), this, SLOT(StopControlExecution()));
@@ -806,6 +807,21 @@ namespace AudioControls
                                 if (eControlType  == eACET_PRELOAD)
                                 {
                                     AZ::StringFunc::Path::StripExtension(sControlName);
+                                }
+                                else if (eControlType == eACET_SWITCH_STATE)
+                                {
+                                    if (!pATLParent->SwitchStateConnectionCheck(pAudioSystemControl))
+                                    {
+                                        QMessageBox messageBox(this);
+                                        messageBox.setStandardButtons(QMessageBox::Ok);
+                                        messageBox.setDefaultButton(QMessageBox::Ok);
+                                        messageBox.setWindowTitle("Audio Controls Editor");
+                                        messageBox.setText("Not in the same switch group, connection failed.");
+                                        if (messageBox.exec() == QMessageBox::Ok)
+                                        {
+                                            return;
+                                        }
+                                    }
                                 }
                                 CATLControl* pTargetControl2 = m_pTreeModel->CreateControl(eControlType, sControlName, pATLParent);
                                 if (pTargetControl2)

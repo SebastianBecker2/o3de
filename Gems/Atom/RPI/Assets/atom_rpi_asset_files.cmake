@@ -7,15 +7,10 @@
 # 
 
 set(FILES
-    Materials/Default.materialtype
-    Materials/DefaultMaterial.azsl
-    Materials/DefaultMaterial.shader
-    Materials/DefaultMaterial_DepthPass.azsl
-    Materials/DefaultMaterial_DepthPass.shader
-    Shader/DecomposeMsImage.azsl
-    Shader/DecomposeMsImage.shader
-    Shader/ImagePreview.azsl
-    Shader/ImagePreview.shader
+    Shaders/DecomposeMsImage.azsl
+    Shaders/DecomposeMsImage.shader
+    Shaders/ImagePreview.azsl
+    Shaders/ImagePreview.shader
     ShaderLib/Atom/RPI/Math.azsli
     ShaderLib/Atom/RPI/TangentSpace.azsli
     ShaderLib/Atom/RPI/ShaderResourceGroups/DefaultDrawSrg.azsli

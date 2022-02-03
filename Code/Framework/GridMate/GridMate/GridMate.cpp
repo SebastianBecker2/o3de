@@ -6,13 +6,15 @@
  *
  */
 
+#include <AzCore/Debug/Budget.h>
 #include <AzCore/Memory/AllocationRecords.h>
 #include <AzCore/std/hash.h>
 
 #include <GridMate/GridMate.h>
 #include <GridMate/GridMateService.h>
 #include <GridMate/GridMateEventsBus.h>
-#include <GridMate/Version.h>
+
+AZ_DEFINE_BUDGET(GridMate);
 
 namespace GridMate
 {
@@ -33,7 +35,7 @@ namespace GridMate
         AZ_CLASS_ALLOCATOR(GridMateImpl, GridMateAllocator, 0);
 
         GridMateImpl(const GridMateDesc& desc);
-        virtual ~GridMateImpl();
+        ~GridMateImpl() override;
 
         void Update() override;
 

@@ -22,6 +22,8 @@
 
 namespace ScriptEvents
 {
+    constexpr const char* k_builderJobKey = "Script Events";
+
     class ScriptEventsAsset
         : public AZ::Data::AssetData
     {
@@ -85,14 +87,15 @@ namespace ScriptEvents
             : AZ::Data::Asset<ScriptEventsAsset>(loadBehavior)
         {}
 
-        ScriptEventsAssetPtr(const BaseType& scriptEventsAsset)
-            : BaseType(scriptEventsAsset)
-        {}
+        ScriptEventsAssetPtr(const ScriptEventsAssetPtr& scriptEventsAsset) = default;
+        ScriptEventsAssetPtr(ScriptEventsAssetPtr&& scriptEventsAsset) = default;
 
         virtual ~ScriptEventsAssetPtr() = default;
 
         using BaseType::BaseType;
-        using BaseType::operator=;
+
+        ScriptEventsAssetPtr& operator=(const ScriptEventsAssetPtr&) = default;
+        ScriptEventsAssetPtr& operator=(ScriptEventsAssetPtr&&) = default;
 
         static void Reflect(AZ::ReflectContext* context)
         {

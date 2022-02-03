@@ -6,8 +6,7 @@
  *
  */
 
-#ifndef __RENDERGL_POSTPROCESS_SHADER_H
-#define __RENDERGL_POSTPROCESS_SHADER_H
+#pragma once
 
 #include <AzCore/IO/Path/Path_fwd.h>
 #include "GLSLShader.h"
@@ -36,8 +35,6 @@ namespace RenderGL
 
     private:
 
-        RenderTexture* mRT;
+        RenderTexture* m_rt;
     };
-}
-
-#endif
+} // namespace RenderGL

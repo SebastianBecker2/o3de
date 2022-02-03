@@ -19,7 +19,6 @@
 #include <Atom/RPI.Public/Material/Material.h>
 #include <Material/MaterialAssetTestUtils.h>
 
-//#include <AtomCore/Serialization/Json/JsonUtils.h>
 namespace UnitTest
 {
     using namespace AZ;
@@ -42,6 +41,7 @@ namespace UnitTest
             {
             }
 
+            using MaterialFunctor::Process;
             void Process(MaterialFunctor::RuntimeContext& context) override
             {
                 m_processResult = context.SetShaderOptionValue(0, m_shaderOptionIndex, m_shaderOptionValue);
@@ -66,6 +66,7 @@ namespace UnitTest
         public:
             MOCK_METHOD0(ProcessCalled, void());
 
+            using MaterialFunctor::Process;
             void Process(RuntimeContext& context) override
             {
                 ProcessCalled();
@@ -88,6 +89,7 @@ namespace UnitTest
             : public MaterialFunctorSourceData
         {
         public:
+            using MaterialFunctorSourceData::CreateFunctor;
             FunctorResult CreateFunctor(const RuntimeContext& context) const override
             {
                 Ptr<PropertyDependencyTestFunctor> functor = aznew PropertyDependencyTestFunctor;
@@ -125,9 +127,7 @@ namespace UnitTest
     {
         using namespace AZ::RPI;
 
-        AZStd::vector<RPI::ShaderOptionValuePair> boolOptionValues;
-        boolOptionValues.push_back({Name("False"),  RPI::ShaderOptionValue(0)});
-        boolOptionValues.push_back({Name("True"), RPI::ShaderOptionValue(1)});
+        AZStd::vector<RPI::ShaderOptionValuePair> boolOptionValues = CreateBoolShaderOptionValues();
 
         AZ::RPI::Ptr<AZ::RPI::ShaderOptionGroupLayout> shaderOptions = RPI::ShaderOptionGroupLayout::Create();
         shaderOptions->AddShaderOption(ShaderOptionDescriptor{Name{"o_optionA"}, ShaderOptionType::Boolean, 0, 0, boolOptionValues, Name{"False"}});
@@ -136,7 +136,6 @@ namespace UnitTest
         shaderOptions->Finalize();
 
         Data::Asset<MaterialTypeAsset> materialTypeAsset;
-        //Data::Asset<MaterialAsset> materialAsset;
 
         // Note we don't actually need any properties or functors in the material type. We just need to set up some sample data
         // structures that we can pass to the functors below, especially the shader with shader options.
@@ -166,7 +165,8 @@ namespace UnitTest
                 materialTypeAsset->GetMaterialPropertiesLayout(),
                 &shaderCollectionCopy,
                 unusedSrg,
-                &testFunctorSetOptionA.GetMaterialPropertyDependencies()
+                &testFunctorSetOptionA.GetMaterialPropertyDependencies(),
+                AZ::RPI::MaterialPropertyPsoHandling::Allowed
             };
             testFunctorSetOptionA.Process(runtimeContext);
             EXPECT_TRUE(testFunctorSetOptionA.GetProcessResult());
@@ -182,7 +182,8 @@ namespace UnitTest
                 materialTypeAsset->GetMaterialPropertiesLayout(),
                 &shaderCollectionCopy,
                 unusedSrg,
-                &testFunctorSetOptionB.GetMaterialPropertyDependencies()
+                &testFunctorSetOptionB.GetMaterialPropertyDependencies(),
+                AZ::RPI::MaterialPropertyPsoHandling::Allowed
             };
             testFunctorSetOptionB.Process(runtimeContext);
             EXPECT_TRUE(testFunctorSetOptionB.GetProcessResult());
@@ -199,7 +200,8 @@ namespace UnitTest
                 materialTypeAsset->GetMaterialPropertiesLayout(),
                 &shaderCollectionCopy,
                 unusedSrg,
-                &testFunctorSetOptionC.GetMaterialPropertyDependencies()
+                &testFunctorSetOptionC.GetMaterialPropertyDependencies(),
+                AZ::RPI::MaterialPropertyPsoHandling::Allowed
             };
             testFunctorSetOptionC.Process(runtimeContext);
             EXPECT_FALSE(testFunctorSetOptionC.GetProcessResult());
@@ -214,7 +216,8 @@ namespace UnitTest
                 materialTypeAsset->GetMaterialPropertiesLayout(),
                 &shaderCollectionCopy,
                 unusedSrg,
-                &testFunctorSetOptionInvalid.GetMaterialPropertyDependencies()
+                &testFunctorSetOptionInvalid.GetMaterialPropertyDependencies(),
+                AZ::RPI::MaterialPropertyPsoHandling::Allowed
             };
             testFunctorSetOptionInvalid.Process(runtimeContext);
             EXPECT_FALSE(testFunctorSetOptionInvalid.GetProcessResult());
@@ -269,7 +272,7 @@ namespace UnitTest
         materialTypeCreator.End(m_testMaterialTypeAsset);
 
         MaterialAssetCreator materialCreator;
-        materialCreator.Begin(Uuid::CreateRandom(), *m_testMaterialTypeAsset);
+        materialCreator.Begin(Uuid::CreateRandom(), m_testMaterialTypeAsset, true);
         materialCreator.SetPropertyValue(registedPropertyName, 42);
         materialCreator.SetPropertyValue(unregistedPropertyName, 42);
         materialCreator.SetPropertyValue(unrelatedPropertyName, 42);

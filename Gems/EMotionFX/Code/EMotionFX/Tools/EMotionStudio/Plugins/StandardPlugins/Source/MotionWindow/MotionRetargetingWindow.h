@@ -6,8 +6,7 @@
  *
  */
 
-#ifndef __EMSTUDIO_MOTIONRETARGETINGWINDOW_H
-#define __EMSTUDIO_MOTIONRETARGETINGWINDOW_H
+#pragma once
 
 // include MCore
 #if !defined(Q_MOC_RUN)
@@ -47,14 +46,8 @@ namespace EMStudio
         void UpdateMotions();
 
     private:
-        MotionWindowPlugin*                 mMotionWindowPlugin;
-        QCheckBox*                          mMotionRetargetingButton;
-        //QCheckBox*                          mRenderMotionBindPose;
-        EMotionFX::ActorInstance*           mSelectedActorInstance;
-        EMotionFX::Actor*                   mActor;
-        CommandSystem::SelectionList        mSelectionList;
+        MotionWindowPlugin*                 m_motionWindowPlugin;
+        QCheckBox*                          m_motionRetargetingButton;
+        CommandSystem::SelectionList        m_selectionList;
     };
 } // namespace EMStudio
-
-
-#endif

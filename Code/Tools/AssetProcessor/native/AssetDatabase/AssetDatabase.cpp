@@ -172,14 +172,8 @@ namespace AssetProcessor
         static const char* CREATEINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY_STATEMENT =
             "CREATE INDEX IF NOT EXISTS BuilderGuid_Source_SourceDependency ON SourceDependency (BuilderGuid, Source);";
         static const char* CREATEINDEX_TYPEOFDEPENDENCY_SOURCEDEPENDENCY = "AssetProcessor::CreateIndexTypeOfDependency_SourceDependency";
-        static const char* CREATEINDEX_TYPEOFDEPENDENCY_SOURCEDEPENDENCY_STATEMENT = 
+        static const char* CREATEINDEX_TYPEOFDEPENDENCY_SOURCEDEPENDENCY_STATEMENT =
             "CREATE INDEX IF NOT EXISTS TypeOfDependency_SourceDependency ON SourceDependency (TypeOfDependency);";
-        
-        static const char* CREATEINDEX_SCANFOLDERS_SOURCES = "AssetProcesser::CreateIndexScanFoldersSources";
-        static const char* CREATEINDEX_SCANFOLDERS_SOURCES_STATEMENT =
-            "CREATE INDEX IF NOT EXISTS ScanFolders_Sources ON Sources (ScanFolderPK);";
-        static const char* DROPINDEX_SCANFOLDERS_SOURCES_STATEMENT =
-            "DROP INDEX IF EXISTS ScanFolders_Sources_idx;";
 
         static const char* CREATEINDEX_SCANFOLDERS_SOURCES_SCANFOLDER = "AssetProcesser::CreateIndexScanFoldersSourcesScanFolder";
         static const char* CREATEINDEX_SCANFOLDERS_SOURCES_SCANFOLDER_STATEMENT =
@@ -188,20 +182,14 @@ namespace AssetProcessor
         static const char* CREATEINDEX_SOURCES_JOBS = "AssetProcesser::CreateIndexSourcesJobs";
         static const char* CREATEINDEX_SOURCES_JOBS_STATEMENT =
             "CREATE INDEX IF NOT EXISTS Sources_Jobs ON Jobs (SourcePK);";
-        static const char* DROPINDEX_SOURCES_JOBS_STATEMENT =
-            "DROP INDEX IF EXISTS Sources_Jobs_idx;";
 
         static const char* CREATEINDEX_JOBS_PRODUCTS = "AssetProcesser::CreateIndexJobsProducts";
         static const char* CREATEINDEX_JOBS_PRODUCTS_STATEMENT =
             "CREATE INDEX IF NOT EXISTS Jobs_Products ON Products (JobPK);";
-        static const char* DROPINDEX_JOBS_PRODUCTS_STATEMENT =
-            "DROP INDEX IF EXISTS Jobs_Products_idx;";
 
         static const char* CREATEINDEX_SOURCE_NAME = "AssetProcessor::CreateIndexSourceName";
         static const char* CREATEINDEX_SOURCE_NAME_STATEMENT =
             "CREATE INDEX IF NOT EXISTS Sources_SourceName ON Sources (SourceName);";
-        static const char* DROPINDEX_SOURCE_NAME_STATEMENT =
-            "DROP INDEX IF EXISTS Sources_SourceName_idx;";
 
         static const char* CREATEINDEX_SOURCE_GUID = "AssetProcessor::CreateIndexSourceGuid";
         static const char* CREATEINDEX_SOURCE_GUID_STATEMENT =
@@ -210,8 +198,6 @@ namespace AssetProcessor
         static const char* CREATEINDEX_PRODUCT_NAME = "AssetProcessor::CreateIndexProductName";
         static const char* CREATEINDEX_PRODUCT_NAME_STATEMENT =
             "CREATE INDEX IF NOT EXISTS Products_ProductName ON Products (ProductName);";
-        static const char* DROPINDEX_PRODUCT_NAME_STATEMENT =
-            "DROP INDEX IF EXISTS Products_ProductName_idx;";
 
         static const char* CREATEINDEX_PRODUCT_SUBID = "AssetProcessor::CreateIndexProductSubID";
         static const char* CREATEINDEX_PRODUCT_SUBID_STATEMENT =
@@ -625,7 +611,7 @@ namespace AssetProcessor
             SqlParam<const char*>(":missingDependencyString"),
             SqlParam<const char*>(":lastScanTime"),
             SqlParam<AZ::u64>(":scanTimeSecondsSinceEpoch"));
-        
+
 
         static const auto s_DeleteMissingProductDependencyByProductIdQuery = MakeSqlQuery(
             DELETE_MISSING_PRODUCT_DEPENDENCY_BY_PRODUCTID,
@@ -657,7 +643,7 @@ namespace AssetProcessor
             SqlParam<const char*>(":analysisFingerprint"));
 
         static const char* INSERT_COLUMN_ANALYSISFINGERPRINT = "AssetProcessor::AddColumnAnalysisFingerprint";
-        static const char* INSERT_COLUMN_ANALYSISFINGERPRINT_STATEMENT = 
+        static const char* INSERT_COLUMN_ANALYSISFINGERPRINT_STATEMENT =
             "ALTER TABLE Sources "
             "ADD AnalysisFingerprint TEXT NOT NULL collate nocase default('');";
 
@@ -667,7 +653,7 @@ namespace AssetProcessor
             "ADD TypeOfDependency INTEGER NOT NULL DEFAULT 0;";
 
         static const char* INSERT_COLUMN_FILE_MODTIME = "AssetProcessor::AddFiles_ModTime";
-        static const char* INSERT_COLUMN_FILE_MODTIME_STATEMENT = 
+        static const char* INSERT_COLUMN_FILE_MODTIME_STATEMENT =
             "ALTER TABLE Files "
             "ADD ModTime INTEGER NOT NULL DEFAULT 0;";
 
@@ -687,7 +673,7 @@ namespace AssetProcessor
             "ADD UnresolvedDependencyType INTEGER NOT NULL DEFAULT 0;";
 
         static const char* INSERT_COLUMN_PRODUCTDEPENDENCY_PLATFORM = "AssetProcessor::AddProductDependency_Platform";
-        static const char* INSERT_COLUMN_PRODUCTDEPENDENCY_PLATFORM_STATEMENT = 
+        static const char* INSERT_COLUMN_PRODUCTDEPENDENCY_PLATFORM_STATEMENT =
             "ALTER TABLE ProductDependencies "
             "ADD Platform TEXT NOT NULL collate nocase default('');";
 
@@ -735,7 +721,7 @@ namespace AssetProcessor
             SqlParam<AZ::s64>(":isfolder"),
             SqlParam<AZ::u64>(":modtime"),
             SqlParam<AZ::u64>(":hash"));
-        
+
         static const char* UPDATE_FILE = "AssetProcessor::UpdateFile";
         static const char* UPDATE_FILE_STATEMENT =
             "UPDATE Files SET "
@@ -772,6 +758,14 @@ namespace AssetProcessor
             "FileID = :fileid;";
         static const auto s_DeleteFileQuery = MakeSqlQuery(DELETE_FILE, DELETE_FILE_STATEMENT, LOG_NAME,
             SqlParam<AZ::s64>(":fileid"));
+
+        static const char* CREATEINDEX_SOURCEDEPENDENCY_SOURCE = "AssetProcesser::CreateIndexSourceSourceDependency";
+        static const char* CREATEINDEX_SOURCEDEPENDENCY_SOURCE_STATEMENT =
+            "CREATE INDEX IF NOT EXISTS Source_SourceDependency ON SourceDependency (Source);";
+
+        static const char* DROPINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY = "AssetProcesser::DropIndexBuilderGuid_Source_SourceDependency";
+        static const char* DROPINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY_STATEMENT =
+            "DROP INDEX IF EXISTS BuilderGuid_Source_SourceDependency;";
     }
 
     AssetDatabaseConnection::AssetDatabaseConnection()
@@ -967,7 +961,7 @@ namespace AssetProcessor
                 AZ_TracePrintf(AssetProcessor::ConsoleChannel, "Upgraded Asset Database to version %i (AddedTypeOfDependencyIndex)\n", foundVersion)
             }
         }
-        
+
         if (foundVersion == AssetDatabase::DatabaseVersion::AddedTypeOfDependencyIndex)
         {
             if (m_databaseConnection->ExecuteOneOffStatement(INSERT_COLUMN_PRODUCTDEPENDENCY_PLATFORM))
@@ -1046,6 +1040,15 @@ namespace AssetProcessor
         // Nothing to do for version `AssetDatabase::DatabaseVersion::RemoveOutputPrefixFromScanFolders`
         // sqlite doesn't not support altering a table to remove a column
         // This is fine as the extra OutputPrefix column will not be queried
+
+        if (foundVersion == AssetDatabase::DatabaseVersion::RemoveOutputPrefixFromScanFolders)
+        {
+            if (m_databaseConnection->ExecuteOneOffStatement(DROPINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY) && m_databaseConnection->ExecuteOneOffStatement(CREATEINDEX_SOURCEDEPENDENCY_SOURCE))
+            {
+                foundVersion = AssetDatabase::DatabaseVersion::AddedSourceIndexForSourceDependencyTable;
+                AZ_TracePrintf(AssetProcessor::ConsoleChannel, "Upgraded Asset Database to version %i (AddedSourceIndexForSourceDependencyTable)\n", foundVersion)
+            }
+        }
 
         if (foundVersion == CurrentDatabaseVersion())
         {
@@ -1175,7 +1178,7 @@ namespace AssetProcessor
         AddStatement(m_databaseConnection, s_InsertJobQuery);
         AddStatement(m_databaseConnection, s_UpdateJobQuery);
         AddStatement(m_databaseConnection, s_DeleteJobQuery);
-        
+
         // ---------------------------------------------------------------------------------------------
         //                  Builder Info Table
         // ---------------------------------------------------------------------------------------------
@@ -1204,7 +1207,7 @@ namespace AssetProcessor
         m_databaseConnection->AddStatement(CREATE_SOURCE_DEPENDENCY_TABLE, CREATE_SOURCE_DEPENDENCY_TABLE_STATEMENT);
         m_databaseConnection->AddStatement(INSERT_COLUMN_SOURCEDEPENDENCY_TYPEOFDEPENDENCY, INSERT_COLUMN_SOURCEDEPENDENCY_TYPEOFDEPENDENCY_STATEMENT);
         m_databaseConnection->AddStatement(INSERT_COLUMNS_SOURCEDEPENDENCY_FROM_ASSETID, INSERT_COLUMNS_SOURCEDEPENDENCY_FROM_ASSETID_STATEMENT);
-        
+
         m_createStatements.push_back(CREATE_SOURCE_DEPENDENCY_TABLE);
 
         AddStatement(m_databaseConnection, s_InsertSourceDependencyQuery);
@@ -1239,7 +1242,7 @@ namespace AssetProcessor
         AddStatement(m_databaseConnection, s_InsertProductDependencyQuery);
         AddStatement(m_databaseConnection, s_UpdateProductDependencyQuery);
         AddStatement(m_databaseConnection, s_DeleteProductDependencyByProductIdQuery);
-        
+
         // ---------------------------------------------------------------------------------------------
         //                   Missing Product Dependency table
         // ---------------------------------------------------------------------------------------------
@@ -1250,7 +1253,7 @@ namespace AssetProcessor
         AddStatement(m_databaseConnection, s_InsertMissingProductDependencyQuery);
         AddStatement(m_databaseConnection, s_UpdateMissingProductDependencyQuery);
         AddStatement(m_databaseConnection, s_DeleteMissingProductDependencyByProductIdQuery);
-        
+
         // ---------------------------------------------------------------------------------------------
         //                  Files table
         // ---------------------------------------------------------------------------------------------
@@ -1320,6 +1323,12 @@ namespace AssetProcessor
         m_databaseConnection->AddStatement(CREATEINDEX_SCANFOLDERS_FILES, CREATEINDEX_SCANFOLDERS_FILES_STATEMENT);
         m_createStatements.push_back(CREATEINDEX_SCANFOLDERS_FILES);
 
+        m_databaseConnection->AddStatement(CREATEINDEX_SOURCEDEPENDENCY_SOURCE, CREATEINDEX_SOURCEDEPENDENCY_SOURCE_STATEMENT);
+        m_createStatements.push_back(CREATEINDEX_SOURCEDEPENDENCY_SOURCE);
+
+        m_databaseConnection->AddStatement(DROPINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY, DROPINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY_STATEMENT);
+        m_createStatements.push_back(DROPINDEX_BUILDERGUID_SOURCE_SOURCEDEPENDENCY);
+
         m_databaseConnection->AddStatement(DELETE_AUTO_SUCCEED_JOBS, DELETE_AUTO_SUCCEED_JOBS_STATEMENT);
     }
 
@@ -1335,7 +1344,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetScanFolderByScanFolderID(AZ::s64 scanfolderID, ScanFolderDatabaseEntry& entry)
     {
         bool found = false;
-        QueryScanFolderByScanFolderID( scanfolderID, 
+        QueryScanFolderByScanFolderID( scanfolderID,
             [&](ScanFolderDatabaseEntry& scanFolderEntry)
             {
                 entry = scanFolderEntry;
@@ -1348,7 +1357,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetScanFolderBySourceID(AZ::s64 sourceID, ScanFolderDatabaseEntry& entry)
     {
         bool found = false;
-        QueryScanFolderBySourceID( sourceID, 
+        QueryScanFolderBySourceID( sourceID,
             [&](ScanFolderDatabaseEntry& scanFolderEntry)
         {
             entry = scanFolderEntry;
@@ -1361,7 +1370,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetScanFolderByJobID(AZ::s64 jobID, ScanFolderDatabaseEntry& entry)
     {
         bool found = false;
-        QueryScanFolderByJobID( jobID, 
+        QueryScanFolderByJobID( jobID,
             [&](ScanFolderDatabaseEntry& scanFolderEntry)
         {
             entry = scanFolderEntry;
@@ -1374,7 +1383,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetScanFolderByProductID(AZ::s64 productID, ScanFolderDatabaseEntry& entry)
     {
         bool found = false;
-        QueryScanFolderByProductID( productID, 
+        QueryScanFolderByProductID( productID,
             [&](ScanFolderDatabaseEntry& scanFolderEntry)
         {
             entry = scanFolderEntry;
@@ -2096,7 +2105,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetProductsLikeProductName(QString likeProductName, LikeType likeType, ProductDatabaseEntryContainer& container, AZ::Uuid builderGuid, QString jobKey, QString platform, JobStatus status)
     {
         bool found = false;
-        
+
         if (likeProductName.isEmpty())
         {
             return false;
@@ -2189,7 +2198,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetProductByJobIDSubId(AZ::s64 jobID, AZ::u32 subID, AzToolsFramework::AssetDatabase::ProductDatabaseEntry& result)
     {
         bool found = false;
-        QueryProductByJobIDSubID(jobID, subID, 
+        QueryProductByJobIDSubID(jobID, subID,
             [&](ProductDatabaseEntry& resultFromDB)
         {
             found = true;
@@ -2303,13 +2312,19 @@ namespace AssetProcessor
         {
             return false;
         }
-        
-        bool succeeded = true;
+
+        ScopedTransaction transaction(m_databaseConnection);
+
         for (auto& entry : container)
         {
-            succeeded &= SetProduct(entry);
+            if(!SetProduct(entry))
+            {
+                return false;
+            }
         }
-        return succeeded;
+
+        transaction.Commit();
+        return true;
     }
 
     //! Clear the products for a given source.  This removes the entry entirely, not just sets it to empty.
@@ -2398,7 +2413,7 @@ namespace AssetProcessor
         if(!platform.isEmpty())
         {
             AZStd::string platformStr = platform.toUtf8().constData();
-            
+
             if (!s_DeleteProductsBySourceidPlatformQuery.BindAndStep(*m_databaseConnection, sourceID, platformStr.c_str()))
             {
                 return false;
@@ -2512,7 +2527,7 @@ namespace AssetProcessor
         {
             succeeded = succeeded && RemoveSourceFileDependency(entry);
         }
-        
+
         if (succeeded)
         {
             transaction.Commit();
@@ -2568,7 +2583,7 @@ namespace AssetProcessor
     }
 
     bool AssetDatabaseConnection::GetDependsOnSourceBySource(
-        const char* source, 
+        const char* source,
         AzToolsFramework::AssetDatabase::SourceFileDependencyEntry::TypeOfDependency typeOfDependency,
         AzToolsFramework::AssetDatabase::SourceFileDependencyEntryContainer& container)
     {
@@ -2587,7 +2602,7 @@ namespace AssetProcessor
     bool AssetDatabaseConnection::GetSourceFileDependencyBySourceDependencyId(AZ::s64 sourceDependencyId, SourceFileDependencyEntry& sourceDependencyEntry)
     {
         bool found = false;
-        QuerySourceDependencyBySourceDependencyId(sourceDependencyId, 
+        QuerySourceDependencyBySourceDependencyId(sourceDependencyId,
             [&](SourceFileDependencyEntry& entry)
         {
             found = true;
@@ -2601,14 +2616,7 @@ namespace AssetProcessor
     {
         ScopedTransaction transaction(m_databaseConnection);
 
-        const char* statementName = INSERT_NEW_LEGACYSUBID;
-
         bool creatingNew = entry.m_subIDsEntryID == InvalidEntryId;
-
-        if (!creatingNew)
-        {
-            statementName = OVERWRITE_EXISTING_LEGACYSUBID;
-        }
 
         if (creatingNew)
         {
@@ -2622,7 +2630,7 @@ namespace AssetProcessor
             return false;
         }
 
-        
+
         if (creatingNew)
         {
             AZ::s64 rowID = m_databaseConnection->GetLastRowID();
@@ -2956,9 +2964,25 @@ namespace AssetProcessor
 
         for(auto& entry : container)
         {
-            if(!SetProductDependency(entry))
+            if(entry.m_productDependencyID == InvalidEntryId)
             {
-                return false;
+                if (!s_InsertProductDependencyQuery.BindAndStep(
+                        *m_databaseConnection, entry.m_productPK, entry.m_dependencySourceGuid, entry.m_dependencySubID,
+                        entry.m_dependencyFlags.to_ullong(), entry.m_platform.c_str(), entry.m_unresolvedPath.c_str(),
+                        entry.m_dependencyType, entry.m_fromAssetId))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                if(!s_UpdateProductDependencyQuery.BindAndStep(
+                    *m_databaseConnection, entry.m_productPK, entry.m_dependencySourceGuid, entry.m_dependencySubID,
+                    entry.m_dependencyFlags.to_ullong(), entry.m_platform.c_str(), entry.m_unresolvedPath.c_str(),
+                    entry.m_productDependencyID, entry.m_dependencyType, entry.m_fromAssetId))
+                {
+                    return false;
+                }
             }
         }
 
@@ -2987,7 +3011,7 @@ namespace AssetProcessor
         }
 
         // now insert the new ones since we know there's no collisions:
-                
+
         for (auto& entry : container)
         {
 
@@ -3107,7 +3131,7 @@ namespace AssetProcessor
             }
 
             Statement* statement = autoFinal.Get();
-            
+
             if (statement->Step() == Statement::SqlError)
             {
                 AZ_Warning(LOG_NAME, false, "Failed to write the new source into the database. %s", entry.m_fileName.c_str());
@@ -3124,7 +3148,7 @@ namespace AssetProcessor
         return UpdateFile(entry, entryAlreadyExists);
     }
 
-    bool AssetDatabaseConnection::UpdateFile(FileDatabaseEntry& entry, bool& entryAlreadyExists) 
+    bool AssetDatabaseConnection::UpdateFile(FileDatabaseEntry& entry, bool& entryAlreadyExists)
     {
         entryAlreadyExists = false;
 

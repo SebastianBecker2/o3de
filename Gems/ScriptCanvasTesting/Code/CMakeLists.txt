@@ -29,7 +29,7 @@ ly_add_target(
     BUILD_DEPENDENCIES
         PUBLIC
             Gem::ScriptCanvas
-            Gem::ScriptCanvasEditor
+            Gem::ScriptCanvas.Editor
             Gem::GraphCanvasWidgets
             Gem::ScriptEvents.Editor
         PRIVATE
@@ -44,7 +44,6 @@ ly_add_target(
             *.ScriptCanvasNodeable.xml,ScriptCanvasNodeable_Source.jinja,$path/$fileprefix.generated.cpp
     RUNTIME_DEPENDENCIES
         Gem::ScriptCanvas.Editor
-        Gem::ScriptCanvasEditor
         Gem::GraphCanvasWidgets
         Gem::ScriptEvents
 )
@@ -77,6 +76,7 @@ ly_add_target(
 
 # By default, the above module is used only in tools:
 ly_create_alias(NAME ScriptCanvasTesting.Tools  NAMESPACE Gem TARGETS Gem::ScriptCanvasTesting.Editor)
+ly_create_alias(NAME ScriptCanvasTesting.Builders  NAMESPACE Gem TARGETS Gem::ScriptCanvasTesting.Editor)
 
 ################################################################################
 # Tests
@@ -87,8 +87,6 @@ if(PAL_TRAIT_BUILD_TESTS_SUPPORTED)
         NAMESPACE Gem
         FILES_CMAKE
             scriptcanvastestingeditor_tests_files.cmake
-        PLATFORM_INCLUDE_FILES
-            Platform/Common/${PAL_TRAIT_COMPILER_ID}/scriptcanvastesting_editor_tests_${PAL_TRAIT_COMPILER_ID_LOWERCASE}.cmake
         INCLUDE_DIRECTORIES
             PRIVATE
                 .
@@ -113,7 +111,6 @@ if(PAL_TRAIT_BUILD_TESTS_SUPPORTED)
     )
     ly_add_googletest(
         NAME Gem::ScriptCanvasTesting.Editor.Tests
-        TEST_SUITE smoke
     )
 endif()
 

@@ -8,124 +8,53 @@
 
 #pragma once
 
-#include <AzCore/Component/Entity.h>
-#include <AzCore/Component/TickBus.h>
-#include <AzCore/UserSettings/UserSettingsProvider.h>
-#include <AzCore/Debug/TraceMessageBus.h>
-
-#include <AzFramework/Application/Application.h>
-#include <AzFramework/Asset/AssetSystemBus.h>
-
-#include <AzToolsFramework/API/AssetDatabaseBus.h>
-#include <AzToolsFramework/API/EditorPythonConsoleBus.h>
-#include <AzToolsFramework/Logger/TraceLogger.h>
-
-#include <Atom/Document/ShaderManagementConsoleDocumentSystemRequestBus.h>
-#include <Atom/Window/ShaderManagementConsoleWindowNotificationBus.h>
-
-#include <AzQtComponents/Application/AzQtApplication.h>
-
-#include <QTimer>
+#include <Atom/RPI.Reflect/Material/MaterialAsset.h>
+#include <AtomToolsFramework/Document/AtomToolsDocumentApplication.h>
+#include <AtomToolsFramework/Window/AtomToolsMainWindowFactoryRequestBus.h>
+#include <AzToolsFramework/API/EditorWindowRequestBus.h>
+#include <ShaderManagementConsoleRequestBus.h>
+#include <Window/ShaderManagementConsoleBrowserInteractions.h>
+#include <Window/ShaderManagementConsoleWindow.h>
 
 namespace ShaderManagementConsole
 {
     class ShaderManagementConsoleApplication
-        : public AzFramework::Application
-        , public AzQtComponents::AzQtApplication
-        , private AzToolsFramework::AssetDatabase::AssetDatabaseRequestsBus::Handler
-        , private ShaderManagementConsoleWindowNotificationBus::Handler
-        , private AzFramework::AssetSystemStatusBus::Handler
-        , private AZ::UserSettingsOwnerRequestBus::Handler
-        , private AZ::Debug::TraceMessageBus::Handler
-        , private AzToolsFramework::EditorPythonConsoleNotificationBus::Handler
+        : public AtomToolsFramework::AtomToolsDocumentApplication
+        , private ShaderManagementConsoleRequestBus::Handler
+        , private AtomToolsFramework::AtomToolsMainWindowFactoryRequestBus::Handler
+        , private AzToolsFramework::EditorWindowRequestBus::Handler
     {
     public:
-        AZ_TYPE_INFO(ShaderManagementConsole::ShaderManagementConsoleApplication, "{30F90CA5-1253-49B5-8143-19CEE37E22BB}");
+        AZ_TYPE_INFO(ShaderManagementConsole::ShaderManagementConsoleApplication, "{A31B1AEB-4DA3-49CD-884A-CC998FF7546F}");
 
-        using Base = AzFramework::Application;
+        using Base = AtomToolsFramework::AtomToolsDocumentApplication;
 
         ShaderManagementConsoleApplication(int* argc, char*** argv);
-        virtual ~ShaderManagementConsoleApplication() = default;
+        ~ShaderManagementConsoleApplication();
 
-        //////////////////////////////////////////////////////////////////////////
-        // AzFramework::Application
-        void CreateReflectionManager() override;
+        // AzFramework::Application overrides...
         void Reflect(AZ::ReflectContext* context) override;
-        void RegisterCoreComponents() override;
-        AZ::ComponentTypeList GetRequiredSystemComponents() const override;
-        void CreateStaticModules(AZStd::vector<AZ::Module*>& outModules) override;
         const char* GetCurrentConfigurationName() const override;
         void StartCommon(AZ::Entity* systemEntity) override;
-        void Tick(float deltaOverride = -1.f) override;
-        void Stop() override;
+
+        // AtomToolsFramework::AtomToolsApplication overrides...
+        AZStd::string GetBuildTargetName() const override;
+        AZStd::vector<AZStd::string> GetCriticalAssetFilters() const override;
+
+        // AzToolsFramework::EditorWindowRequests::Bus::Handler
+        QWidget* GetAppMainWindow() override;
+
+        // AtomToolsMainWindowFactoryRequestBus::Handler overrides...
+        void CreateMainWindow() override;
+        void DestroyMainWindow() override;
+
+        // ShaderManagementConsoleRequestBus::Handler overrides...
+        AZ::Data::AssetInfo GetSourceAssetInfo(const AZStd::string& sourceAssetFileName) override;
+        AZStd::vector<AZ::Data::AssetId> FindMaterialAssetsUsingShader(const AZStd::string& shaderFilePath) override;
+        AZStd::vector<AZ::RPI::ShaderCollection::Item> GetMaterialInstanceShaderItems(const AZ::Data::AssetId& assetId) override;
 
     private:
-        //////////////////////////////////////////////////////////////////////////
-        // AssetDatabaseRequestsBus::Handler overrides...
-        bool GetAssetDatabaseLocation(AZStd::string& result) override;
-        //////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // ShaderManagementConsoleWindowNotificationBus::Handler overrides...
-        void OnShaderManagementConsoleWindowClosing() override;
-        //////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // AzFramework::Application overrides...
-        void Destroy() override;
-        //////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // AzFramework::ApplicationRequests::Bus overrides...
-        void QueryApplicationType(AZ::ApplicationTypeQuery& appType) const override;
-        //////////////////////////////////////////////////////////////////////////
-
-        ////////////////////////////////////////////////////////////////////////
-        // EditorPythonConsoleNotificationBus::Handler overrides...
-        void OnTraceMessage(AZStd::string_view message) override;
-        void OnErrorMessage(AZStd::string_view message) override;
-        void OnExceptionMessage(AZStd::string_view message) override;
-        ////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // AzFramework::AssetSystemStatusBus::Handler overrides...
-        void AssetSystemAvailable() override;
-        //////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // AZ::UserSettingsOwnerRequestBus::Handler overrides...
-        void SaveSettings() override;
-        //////////////////////////////////////////////////////////////////////////
-
-        //////////////////////////////////////////////////////////////////////////
-        // AZ::Debug::TraceMessageBus::Handler overrides...
-        bool OnPrintf(const char* window, const char* message) override;
-        //////////////////////////////////////////////////////////////////////////
-
-        void CompileCriticalAssets();
-
-        void ProcessCommandLine();
-
-        void LoadSettings();
-        void UnloadSettings();
-
-        bool LaunchDiscoveryService();
-
-        void StartInternal();
-
-        static void PyIdleWaitFrames(uint32_t frames);
-
-        AzToolsFramework::TraceLogger m_traceLogger;
-
-        //! Local user settings are used to store asset browser tree expansion state
-        AZ::UserSettingsProvider m_localUserSettings;
-
-        //! Are local settings loaded
-        bool m_activatedLocalUserSettings = false;
-
-        QTimer m_timer;
-
-        bool m_started = false;
-        bool m_closing = false;
+        AZStd::unique_ptr<ShaderManagementConsoleWindow> m_window;
+        AZStd::unique_ptr<ShaderManagementConsoleBrowserInteractions> m_assetBrowserInteractions;
     };
 } // namespace ShaderManagementConsole

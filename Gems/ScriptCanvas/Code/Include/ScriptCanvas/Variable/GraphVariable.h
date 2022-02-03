@@ -127,6 +127,8 @@ namespace ScriptCanvas
 
         const Datum*    GetDatum() const;
 
+        Datum& ModDatum();
+
         bool IsComponentProperty() const;
 
         void ConfigureDatumView(ModifiableDatumView& accessController);
@@ -134,9 +136,6 @@ namespace ScriptCanvas
         void SetVariableName(AZStd::string_view displayName);
         AZStd::string_view GetVariableName() const;
 
-        void SetDisplayName(const AZStd::string& displayName);
-        AZStd::string_view GetDisplayName() const;
-        
         void SetScriptInputControlVisibility(const AZ::Crc32& inputControlVisibility);
 
         AZ::Crc32 GetInputControlVisibility() const;
@@ -197,9 +196,7 @@ namespace ScriptCanvas
             choices.emplace_back(AZStd::make_pair(static_cast<unsigned char>(VariableFlags::Scope::Function), s_ScopeNames[1]));
             return choices;
         }
-
-        bool IsInFunction() const;
-        
+                
         void OnScopeTypedChanged();
         AZ::u32 OnInitialValueSourceChanged();
         void OnSortPriorityChanged();

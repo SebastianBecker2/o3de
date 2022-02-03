@@ -15,7 +15,6 @@
 
 // Editor
 #include "ReflectedPropertyCtrl.h"
-#include "UIEnumsDatabase.h"
 
 namespace {
 
@@ -39,20 +38,20 @@ namespace {
             hardMin = desc.m_bHardMin;
             hardMax = desc.m_bHardMax;
         }
-        reflectedVar->m_softMinVal = min;
-        reflectedVar->m_softMaxVal = max;
+        reflectedVar->m_softMinVal = static_cast<R>(min);
+        reflectedVar->m_softMaxVal = static_cast<R>(max);
 
         if (hardMin)
         {
-            reflectedVar->m_minVal = min;
+            reflectedVar->m_minVal = static_cast<R>(min);
         }
         else
         {
-            reflectedVar->m_minVal = std::numeric_limits<int>::lowest();
+            reflectedVar->m_minVal = std::numeric_limits<R>::lowest();
         }
         if (hardMax)
         {
-            reflectedVar->m_maxVal = max;
+            reflectedVar->m_maxVal = static_cast<R>(max);
         }
         else
         {
@@ -64,9 +63,9 @@ namespace {
               ../Code/Editor/Controls/ReflectedPropertyControl/ReflectedVarWrapper.cpp:59:38: error: implicit conversion from 'int' to 'float' changes value from 2147483647 to 2147483648 [-Werror,-Wimplicit-int-float-conversion]
               reflectedVar->m_maxVal = std::numeric_limits<int>::max();
             */
-            reflectedVar->m_maxVal = static_cast<float>(std::numeric_limits<int>::max());
+            reflectedVar->m_maxVal = static_cast<R>(std::numeric_limits<int>::max());
         }
-        reflectedVar->m_stepSize = step;
+        reflectedVar->m_stepSize = static_cast<R>(step);
     }
 }
 
@@ -95,9 +94,9 @@ void ReflectedVarIntAdapter::SyncReflectedVarToIVar(IVariable *pVariable)
     {
         int intValue;
         pVariable->Get(intValue);
-        value = intValue;
+        value = static_cast<float>(intValue);
     }
-    m_reflectedVar->m_value = std::round(value * m_valueMultiplier);
+    m_reflectedVar->m_value = static_cast<int>(std::round(value * m_valueMultiplier));
 }
 
 void ReflectedVarIntAdapter::SyncIVarToReflectedVar(IVariable *pVariable)
@@ -254,41 +253,6 @@ void ReflectedVarEnumAdapter::OnVariableChange([[maybe_unused]] IVariable* pVari
     }
 }
 
-void ReflectedVarDBEnumAdapter::SetVariable(IVariable *pVariable)
-{
-    Prop::Description desc(pVariable);
-    m_pEnumDBItem = desc.m_pEnumDBItem;
-    m_reflectedVar.reset(new CReflectedVarEnum<AZStd::string>(pVariable->GetHumanName().toUtf8().data()));
-    if (m_pEnumDBItem)
-    {
-        for (int i = 0; i < m_pEnumDBItem->strings.size(); i++)
-        {
-            QString name = m_pEnumDBItem->strings[i];
-            m_reflectedVar->addEnum( m_pEnumDBItem->NameToValue(name).toUtf8().data(), name.toUtf8().data() );
-        }
-    }
-}
-
-void ReflectedVarDBEnumAdapter::SyncReflectedVarToIVar(IVariable *pVariable)
-{
-    const AZStd::string valueStr = pVariable->GetDisplayValue().toUtf8().data();
-    const AZStd::string value = m_pEnumDBItem ? AZStd::string(m_pEnumDBItem->ValueToName(valueStr.c_str()).toUtf8().data()) : valueStr;
-    m_reflectedVar->setEnumByName(value);
-
-}
-
-void ReflectedVarDBEnumAdapter::SyncIVarToReflectedVar(IVariable *pVariable)
-{
-    QString iVarVal = m_reflectedVar->m_selectedEnumName.c_str();
-    if (m_pEnumDBItem)
-    {
-        iVarVal = m_pEnumDBItem->NameToValue(iVarVal);
-    }
-    pVariable->SetDisplayValue(iVarVal);
-}
-
-
-
 void ReflectedVarVector2Adapter::SetVariable(IVariable *pVariable)
 {
     m_reflectedVar.reset(new CReflectedVarVector2(pVariable->GetHumanName().toUtf8().data()));
@@ -362,14 +326,14 @@ void ReflectedVarColorAdapter::SyncReflectedVarToIVar(IVariable *pVariable)
         Vec3 v(0, 0, 0);
         pVariable->Get(v);
         const QColor col = ColorLinearToGamma(ColorF(v.x, v.y, v.z));
-        m_reflectedVar->m_color.Set(col.redF(), col.greenF(), col.blueF());
+        m_reflectedVar->m_color.Set(static_cast<float>(col.redF()), static_cast<float>(col.greenF()), static_cast<float>(col.blueF()));
     }
     else
     {
         int col(0);
         pVariable->Get(col);
         const QColor qcolor = ColorToQColor((uint32)col);
-        m_reflectedVar->m_color.Set(qcolor.redF(), qcolor.greenF(), qcolor.blueF());
+        m_reflectedVar->m_color.Set(static_cast<float>(qcolor.redF()), static_cast<float>(qcolor.greenF()), static_cast<float>(qcolor.blueF()));
     }
 }
 
@@ -382,34 +346,15 @@ void ReflectedVarColorAdapter::SyncIVarToReflectedVar(IVariable *pVariable)
     }
     else
     {
-        int ir = m_reflectedVar->m_color.GetX() * 255.0f;
-        int ig = m_reflectedVar->m_color.GetY() * 255.0f;
-        int ib = m_reflectedVar->m_color.GetZ() * 255.0f;
+        int ir = static_cast<int>(m_reflectedVar->m_color.GetX() * 255.0f);
+        int ig = static_cast<int>(m_reflectedVar->m_color.GetY() * 255.0f);
+        int ib = static_cast<int>(m_reflectedVar->m_color.GetZ() * 255.0f);
 
         pVariable->Set(static_cast<int>(RGB(ir, ig, ib)));
     }
 }
 
 
-
-void ReflectedVarAnimationAdapter::SetVariable(IVariable *pVariable)
-{
-    m_reflectedVar.reset(new CReflectedVarAnimation(pVariable->GetHumanName().toUtf8().data()));
-    m_reflectedVar->m_description = pVariable->GetDescription().toUtf8().data();
-}
-
-void ReflectedVarAnimationAdapter::SyncReflectedVarToIVar(IVariable *pVariable)
-{
-    m_reflectedVar->m_entityID = static_cast<AZ::EntityId>(pVariable->GetUserData().value<AZ::u64>());
-    m_reflectedVar->m_animation = pVariable->GetDisplayValue().toUtf8().data();
-}
-
-void ReflectedVarAnimationAdapter::SyncIVarToReflectedVar(IVariable *pVariable)
-{
-    pVariable->SetUserData(static_cast<AZ::u64>(m_reflectedVar->m_entityID));
-    pVariable->SetDisplayValue(m_reflectedVar->m_animation.c_str());
-
-}
 
 void ReflectedVarResourceAdapter::SetVariable(IVariable *pVariable)
 {
@@ -429,7 +374,7 @@ void ReflectedVarResourceAdapter::SyncReflectedVarToIVar(IVariable *pVariable)
 
 void ReflectedVarResourceAdapter::SyncIVarToReflectedVar(IVariable *pVariable)
 {
-    const bool bForceModified = (m_reflectedVar->m_propertyType == ePropertyGeomCache);
+    const bool bForceModified = false;
     pVariable->SetForceModified(bForceModified);
     pVariable->SetDisplayValue(m_reflectedVar->m_path.c_str());
 
@@ -465,41 +410,54 @@ void ReflectedVarUserAdapter::SetVariable(IVariable *pVariable)
     m_reflectedVar.reset(new CReflectedVarUser( pVariable->GetHumanName().toUtf8().data()));
 }
 
-void ReflectedVarUserAdapter::SyncReflectedVarToIVar(IVariable *pVariable)
+void ReflectedVarUserAdapter::SyncReflectedVarToIVar(IVariable* pVariable)
 {
     QString value;
     pVariable->Get(value);
     m_reflectedVar->m_value = value.toUtf8().data();
 
-    //extract the list of custom items from the IVariable user data
-    IVariable::IGetCustomItems* pGetCustomItems = static_cast<IVariable::IGetCustomItems*> (pVariable->GetUserData().value<void *>());
-    if (pGetCustomItems != 0)
-    {
-        std::vector<IVariable::IGetCustomItems::SItem> items;
-        QString dlgTitle;
-        // call the user supplied callback to fill-in items and get dialog title
-        bool bShowIt = pGetCustomItems->GetItems(pVariable, items, dlgTitle);
-        if (bShowIt) // if func didn't veto, show the dialog
-        {
-            m_reflectedVar->m_enableEdit = true;
-            m_reflectedVar->m_useTree = pGetCustomItems->UseTree();
-            m_reflectedVar->m_treeSeparator = pGetCustomItems->GetTreeSeparator();
-            m_reflectedVar->m_dialogTitle = dlgTitle.toUtf8().data();
-            m_reflectedVar->m_itemNames.resize(items.size());
-            m_reflectedVar->m_itemDescriptions.resize(items.size());
-
-            QByteArray ba;
-            int i = -1;
-            std::generate(m_reflectedVar->m_itemNames.begin(), m_reflectedVar->m_itemNames.end(), [&items, &i, &ba]() { ++i; ba = items[i].name.toUtf8(); return ba.data(); });
-            i = -1;
-            std::generate(m_reflectedVar->m_itemDescriptions.begin(), m_reflectedVar->m_itemDescriptions.end(), [&items, &i, &ba]() { ++i; ba = items[i].desc.toUtf8(); return ba.data(); });
-
-        }
-    }
-    else
+    // extract the list of custom items from the IVariable user data
+    IVariable::IGetCustomItems* pGetCustomItems = static_cast<IVariable::IGetCustomItems*>(pVariable->GetUserData().value<void*>());
+    if (pGetCustomItems == nullptr)
     {
         m_reflectedVar->m_enableEdit = false;
+        return;
     }
+
+    std::vector<IVariable::IGetCustomItems::SItem> items;
+    QString dlgTitle;
+    // call the user supplied callback to fill-in items and get dialog title
+    bool bShowIt = pGetCustomItems->GetItems(pVariable, items, dlgTitle);
+    if (!bShowIt) // if func vetoed it, don't show the dialog
+    {
+        return;
+    }
+    m_reflectedVar->m_enableEdit = true;
+    m_reflectedVar->m_useTree = pGetCustomItems->UseTree();
+    m_reflectedVar->m_treeSeparator = pGetCustomItems->GetTreeSeparator();
+    m_reflectedVar->m_dialogTitle = dlgTitle.toUtf8().data();
+    m_reflectedVar->m_itemNames.resize(items.size());
+    m_reflectedVar->m_itemDescriptions.resize(items.size());
+
+    QByteArray ba;
+    int i = -1;
+    AZStd::generate(
+        m_reflectedVar->m_itemNames.begin(), m_reflectedVar->m_itemNames.end(),
+        [&items, &i, &ba]()
+        {
+            ++i;
+            ba = items[i].name.toUtf8();
+            return ba.data();
+        });
+    i = -1;
+    AZStd::generate(
+        m_reflectedVar->m_itemDescriptions.begin(), m_reflectedVar->m_itemDescriptions.end(),
+        [&items, &i, &ba]()
+        {
+            ++i;
+            ba = items[i].desc.toUtf8();
+            return ba.data();
+        });
 }
 
 void ReflectedVarUserAdapter::SyncIVarToReflectedVar(IVariable *pVariable)

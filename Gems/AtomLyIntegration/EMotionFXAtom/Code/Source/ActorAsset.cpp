@@ -39,27 +39,8 @@
 // Copied from ModelAssetBuilderComponent.cpp
 namespace
 {
-    const AZ::u32 IndicesPerFace = 3;
-    const AZ::RHI::Format IndicesFormat = AZ::RHI::Format::R32_UINT;
-
-    const AZ::u32 PositionFloatsPerVert = 3;
-    const AZ::u32 NormalFloatsPerVert = 3;
-    const AZ::u32 UVFloatsPerVert = 2;
-    const AZ::u32 ColorFloatsPerVert = 4;
-    const AZ::u32 TangentFloatsPerVert = 4;
-    const AZ::u32 BitangentFloatsPerVert = 3;
-
-    const AZ::RHI::Format PositionFormat = AZ::RHI::Format::R32G32B32_FLOAT;
-    const AZ::RHI::Format NormalFormat = AZ::RHI::Format::R32G32B32_FLOAT;
-    const AZ::RHI::Format UVFormat = AZ::RHI::Format::R32G32_FLOAT;
-    const AZ::RHI::Format ColorFormat = AZ::RHI::Format::R32G32B32A32_FLOAT;
-    const AZ::RHI::Format TangentFormat = AZ::RHI::Format::R32G32B32A32_FLOAT;
-    const AZ::RHI::Format BitangentFormat = AZ::RHI::Format::R32G32B32_FLOAT;
-    const AZ::RHI::Format BoneIndexFormat = AZ::RHI::Format::R32G32B32A32_UINT;
-    const AZ::RHI::Format BoneWeightFormat = AZ::RHI::Format::R32G32B32A32_FLOAT;
-
-    const size_t LinearSkinningFloatsPerBone = 12;
-    const size_t DualQuaternionSkinningFloatsPerBone = 8;
+    const uint32_t LinearSkinningFloatsPerBone = 12;
+    const uint32_t DualQuaternionSkinningFloatsPerBone = 8;
     const uint32_t MaxSupportedSkinInfluences = 4;
 }
 
@@ -78,7 +59,7 @@ namespace AZ
             lodVertexCount = 0;
 
             const Data::Asset<RPI::ModelLodAsset>& lodAsset = actor->GetMeshAsset()->GetLodAssets()[lodIndex];
-            const AZStd::array_view<RPI::ModelLodAsset::Mesh> modelMeshes = lodAsset->GetMeshes();
+            const AZStd::span<const RPI::ModelLodAsset::Mesh> modelMeshes = lodAsset->GetMeshes();
             for (const RPI::ModelLodAsset::Mesh& modelMesh : modelMeshes)
             {
                 const size_t subMeshIndexCount = modelMesh.GetIndexCount();
@@ -96,12 +77,11 @@ namespace AZ
                         skinnedSubMesh.m_vertexCount = aznumeric_cast<uint32_t>(subMeshVertexCount);
                         lodVertexCount += aznumeric_cast<uint32_t>(subMeshVertexCount);
 
-                        // The default material id used by a sub-mesh is the guid of the source scene file plus the subId which is a unique material ID from the scene API
-                        AZ::u32 subId = modelMesh.GetMaterialAsset().GetId().m_subId;
-                        AZ::Data::AssetId materialId{ actorAssetId.m_guid, subId };
+                        skinnedSubMesh.m_materialSlot = actor->GetMeshAsset()->FindMaterialSlot(modelMesh.GetMaterialSlotId());
 
                         // Queue the material asset - the ModelLod seems to handle delayed material loads
-                        skinnedSubMesh.m_material = Data::AssetManager::Instance().GetAsset(materialId, azrtti_typeid<RPI::MaterialAsset>(), skinnedSubMesh.m_material.GetAutoLoadBehavior());
+                        skinnedSubMesh.m_materialSlot.m_defaultMaterialAsset.QueueLoad();
+
                         subMeshes.push_back(skinnedSubMesh);
                     }
                     else
@@ -150,11 +130,11 @@ namespace AZ
             }
         }
 
-        static void ProcessUVsForSubmesh(size_t vertexCount, size_t atomVertexBufferOffset, [[maybe_unused]] size_t emfxSourceVertexStart, const AZ::Vector2* emfxSourceUVs, AZStd::vector<float[2]>& uvBufferData)
+        static void ProcessUVsForSubmesh(size_t vertexCount, size_t atomVertexBufferOffset, [[maybe_unused]] size_t emfxSourceVertexStart, const AZ::Vector2* emfxSourceUVs, AZStd::vector<AZStd::array<float, 2>>& uvBufferData)
         {
             for (size_t vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
             {
-                emfxSourceUVs[vertexIndex].StoreToFloat2(uvBufferData[atomVertexBufferOffset + vertexIndex]);
+                emfxSourceUVs[vertexIndex].StoreToFloat2(uvBufferData[atomVertexBufferOffset + vertexIndex].data());
             }
         }
 
@@ -195,7 +175,7 @@ namespace AZ
             const EMotionFX::Mesh* mesh,
             const EMotionFX::SubMesh* subMesh,
             size_t atomVertexBufferOffset,
-            AZStd::vector<uint32_t[MaxSupportedSkinInfluences / 2]>& blendIndexBufferData,
+            AZStd::vector<AZStd::array<uint32_t, MaxSupportedSkinInfluences / 2>>& blendIndexBufferData,
             AZStd::vector<AZStd::array<float, MaxSupportedSkinInfluences>>& blendWeightBufferData,
             bool hasClothData)
         {
@@ -212,9 +192,8 @@ namespace AZ
                 for (uint32_t vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
                 {
                     const uint32_t originalVertex = sourceOriginalVertex[vertexIndex + vertexStart];
-                    const uint32_t influenceCount = AZStd::GetMin<uint32_t>(MaxSupportedSkinInfluences, sourceSkinningInfo->GetNumInfluences(originalVertex));
+                    const uint32_t influenceCount = AZStd::GetMin<uint32_t>(MaxSupportedSkinInfluences, static_cast<uint32_t>(sourceSkinningInfo->GetNumInfluences(originalVertex)));
                     uint32_t influenceIndex = 0;
-                    float weightError = 1.0f;
 
                     AZStd::vector<uint32_t> localIndices;
                     for (; influenceIndex < influenceCount; ++influenceIndex)
@@ -222,7 +201,6 @@ namespace AZ
                         EMotionFX::SkinInfluence* influence = sourceSkinningInfo->GetInfluence(originalVertex, influenceIndex);
                         localIndices.push_back(static_cast<uint32_t>(influence->GetNodeNr()));
                         blendWeightBufferData[atomVertexBufferOffset + vertexIndex][influenceIndex] = influence->GetWeight();
-                        weightError -= blendWeightBufferData[atomVertexBufferOffset + vertexIndex][influenceIndex];
                     }
 
                     // Zero out any unused ids/weights
@@ -267,7 +245,7 @@ namespace AZ
             }
         }
         
-        static void ProcessMorphsForLod(const EMotionFX::Actor* actor, const Data::Asset<RPI::BufferAsset>& morphBufferAsset, uint32_t lodIndex, const AZStd::string& fullFileName, SkinnedMeshInputLod& skinnedMeshLod)
+        static void ProcessMorphsForLod(const EMotionFX::Actor* actor, const Data::Asset<RPI::BufferAsset>& morphBufferAsset, size_t lodIndex, const AZStd::string& fullFileName, SkinnedMeshInputLod& skinnedMeshLod)
         {
             EMotionFX::MorphSetup* morphSetup = actor->GetMorphSetup(lodIndex);
             if (morphSetup)
@@ -276,8 +254,8 @@ namespace AZ
                 const AZStd::vector<AZ::RPI::MorphTargetMetaAsset::MorphTarget>& metaDatas = actor->GetMorphTargetMetaAsset()->GetMorphTargets();
 
                 // Loop over all the EMotionFX morph targets
-                const AZ::u32 numMorphTargets = morphSetup->GetNumMorphTargets();
-                for (AZ::u32 morphTargetIndex = 0; morphTargetIndex < numMorphTargets; ++morphTargetIndex)
+                const size_t numMorphTargets = morphSetup->GetNumMorphTargets();
+                for (size_t morphTargetIndex = 0; morphTargetIndex < numMorphTargets; ++morphTargetIndex)
                 {
                     EMotionFX::MorphTargetStandard* morphTarget = static_cast<EMotionFX::MorphTargetStandard*>(morphSetup->GetMorphTarget(morphTargetIndex));
                     for (const auto& metaData : metaDatas)
@@ -289,7 +267,7 @@ namespace AZ
                         if (metaData.m_morphTargetName == morphTarget->GetNameString() && metaData.m_numVertices > 0)
                         {
                             // The skinned mesh lod gets a unique morph for each meta, since each one has unique min/max delta values to use for decompression
-                            AZStd::string morphString = AZStd::string::format("%s_Lod%u_Morph_%s", fullFileName.c_str(), lodIndex, metaData.m_meshNodeName.c_str());
+                            const AZStd::string morphString = AZStd::string::format("%s_Lod%zu_Morph_%s", fullFileName.c_str(), lodIndex, metaData.m_meshNodeName.c_str());
 
                             float minWeight = morphTarget->GetRangeMin();
                             float maxWeight = morphTarget->GetRangeMax();
@@ -332,9 +310,9 @@ namespace AZ
             AZStd::vector<PackedVector3f> normalBufferData;
             AZStd::vector<Vector4> tangentBufferData;
             AZStd::vector<PackedVector3f> bitangentBufferData;
-            AZStd::vector<uint32_t[MaxSupportedSkinInfluences / 2]> blendIndexBufferData;
+            AZStd::vector<AZStd::array<uint32_t, MaxSupportedSkinInfluences / 2>> blendIndexBufferData;
             AZStd::vector<AZStd::array<float, MaxSupportedSkinInfluences>> blendWeightBufferData;
-            AZStd::vector<float[2]> uvBufferData;
+            AZStd::vector<AZStd::array<float, 2>> uvBufferData;
 
             //
             // Process all LODs from the EMotionFX actor data.
@@ -379,7 +357,7 @@ namespace AZ
                 size_t skinnedMeshSubmeshIndex = 0;
                 for (size_t jointIndex = 0; jointIndex < numJoints; ++jointIndex)
                 {
-                    const EMotionFX::Mesh* mesh = actor->GetMesh(lodIndex, jointIndex);
+                    const EMotionFX::Mesh* mesh = actor->GetMesh(static_cast<uint32>(lodIndex), static_cast<uint32>(jointIndex));
                     if (!mesh || mesh->GetIsCollisionMesh())
                     {
                         continue;
@@ -405,7 +383,7 @@ namespace AZ
 
                     for (size_t subMeshIndex = 0; subMeshIndex < numSubMeshes; ++subMeshIndex)
                     {
-                        const EMotionFX::SubMesh* subMesh = mesh->GetSubMesh(subMeshIndex);
+                        const EMotionFX::SubMesh* subMesh = mesh->GetSubMesh(static_cast<uint32>(subMeshIndex));
                         const size_t vertexCount = subMesh->GetNumVertices();
 
                         // Skip empty sub-meshes and sub-meshes that would put the total vertex count beyond the supported range
@@ -509,7 +487,7 @@ namespace AZ
 
                 if (morphBufferAssetView)
                 {
-                    ProcessMorphsForLod(actor, morphBufferAssetView->GetBufferAsset(), lodIndex, fullFileName, skinnedMeshLod);
+                    ProcessMorphsForLod(actor, morphBufferAssetView->GetBufferAsset(), static_cast<uint32_t>(lodIndex), fullFileName, skinnedMeshLod);
                 }
 
                 // Set colors after morphs are set, so that we know whether or not they are dynamic (if they exist)
@@ -563,8 +541,8 @@ namespace AZ
                 for (size_t i = 0; i < numBoneTransforms; ++i)
                 {
                     MCore::DualQuaternion dualQuat = MCore::DualQuaternion::ConvertFromTransform(AZ::Transform::CreateFromMatrix3x4(skinningMatrices[i]));
-                    dualQuat.mReal.StoreToFloat4(&boneTransforms[i * DualQuaternionSkinningFloatsPerBone]);
-                    dualQuat.mDual.StoreToFloat4(&boneTransforms[i * DualQuaternionSkinningFloatsPerBone + 4]);
+                    dualQuat.m_real.StoreToFloat4(&boneTransforms[i * DualQuaternionSkinningFloatsPerBone]);
+                    dualQuat.m_dual.StoreToFloat4(&boneTransforms[i * DualQuaternionSkinningFloatsPerBone + 4]);
                 }
             }
         }
@@ -575,7 +553,7 @@ namespace AZ
             AZStd::vector<float> boneTransforms;
             GetBoneTransformsFromActorInstance(actorInstance, boneTransforms, skinningMethod);
 
-            size_t floatsPerBone = 0;
+            uint32_t floatsPerBone = 0;
             if (skinningMethod == EMotionFX::Integration::SkinningMethod::Linear)
             {
                 floatsPerBone = LinearSkinningFloatsPerBone;
@@ -594,7 +572,7 @@ namespace AZ
             descriptor.m_bufferData = boneTransforms.data();
             descriptor.m_bufferName = AZStd::string::format("BoneTransformBuffer_%s", actorInstance->GetActor()->GetName());
             descriptor.m_byteCount = boneTransforms.size() * sizeof(float);
-            descriptor.m_elementSize = floatsPerBone * sizeof(float);
+            descriptor.m_elementSize = static_cast<uint32_t>(floatsPerBone * sizeof(float));
             descriptor.m_poolType = RPI::CommonBufferPoolType::ReadOnly;
             return RPI::BufferSystemInterface::Get()->CreateBufferFromCommonPool(descriptor);
         }

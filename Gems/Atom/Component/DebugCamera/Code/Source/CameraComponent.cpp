@@ -185,6 +185,15 @@ namespace AZ
             return m_componentConfig.m_depthFar * tanf(m_componentConfig.m_fovY / 2) * 2;
         }
 
+        bool CameraComponent::IsOrthographic()
+        {
+            return false;
+        }
+
+        float CameraComponent::GetOrthographicHalfWidth()
+        {
+            return 0.0f;
+        }
 
         void CameraComponent::SetFovDegrees(float fov)
         {
@@ -226,15 +235,54 @@ namespace AZ
             UpdateViewToClipMatrix();
         }
 
-        void CameraComponent::MakeActiveView() 
+        void CameraComponent::SetOrthographic([[maybe_unused]] bool orthographic)
+        {
+            AZ_Assert(!orthographic, "DebugCamera does not support orthographic projection");
+        }
+
+        void CameraComponent::SetOrthographicHalfWidth([[maybe_unused]] float halfWidth)
+        {
+            AZ_Assert(false, "DebugCamera does not support orthographic projection");
+        }
+
+        void CameraComponent::MakeActiveView()
         {
             // do nothing
         }
 
+        bool CameraComponent::IsActiveView()
+        {
+            return false;
+        }
+
+        AZ::Vector3 CameraComponent::ScreenToWorld([[maybe_unused]] const AZ::Vector2& screenPosition, [[maybe_unused]] float depth)
+        {
+            // not implemented
+            return AZ::Vector3::CreateZero();
+        }
+
+        AZ::Vector3 CameraComponent::ScreenNdcToWorld([[maybe_unused]] const AZ::Vector2& screenPosition, [[maybe_unused]] float depth)
+        {
+            // not implemented
+            return AZ::Vector3::CreateZero();
+        }
+
+        AZ::Vector2 CameraComponent::WorldToScreen([[maybe_unused]] const AZ::Vector3& worldPosition)
+        {
+            // not implemented
+            return AZ::Vector2::CreateZero();
+        }
+
+        AZ::Vector2 CameraComponent::WorldToScreenNdc([[maybe_unused]] const AZ::Vector3& worldPosition)
+        {
+            // not implemented
+            return AZ::Vector2::CreateZero();
+        }
+
         void CameraComponent::OnViewportResized(uint32_t width, uint32_t height)
         {
-            AZ_UNUSED(width)
-            AZ_UNUSED(height)
+            AZ_UNUSED(width);
+            AZ_UNUSED(height);
             UpdateAspectRatio();
             UpdateViewToClipMatrix();
         }
@@ -248,7 +296,10 @@ namespace AZ
             else if (m_componentConfig.m_target)
             {
                 const auto& viewport = m_componentConfig.m_target->GetViewport();
-                m_aspectRatio = viewport.m_maxX / viewport.m_maxY;
+                if (viewport.m_maxX > 0.0f && viewport.m_maxY > 0.0f)
+                {
+                    m_aspectRatio = viewport.m_maxX / viewport.m_maxY;
+                }
             }
         }
 

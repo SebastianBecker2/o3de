@@ -20,7 +20,6 @@
 #include <AzFramework/StringFunc/StringFunc.h>
 #include <AzFramework/Application/Application.h>
 
-#include <AzFramework/Process/ProcessCommunicator.h>
 #include <AzFramework/Process/ProcessWatcher.h>
 #include <AzToolsFramework/Application/ToolsApplication.h>
 
@@ -31,7 +30,6 @@
 
 #include "native/utilities/assetUtils.h"
 #include "native/utilities/AssetBuilderInfo.h"
-#include "native/utilities/CommunicatorTracePrinter.h"
 
 #include <AssetProcessor_Traits_Platform.h>
 
@@ -322,7 +320,7 @@ namespace AssetProcessor
         executableDirectory /= ASSETPROCESSOR_TRAIT_LEGACY_RC_RELATIVE_PATH;
         if (AZ::IO::SystemFile::Exists(executableDirectory.c_str()))
         {
-            rcAbsolutePathOut = QString::fromUtf8(executableDirectory.c_str(), executableDirectory.Native().size());
+            rcAbsolutePathOut = QString::fromUtf8(executableDirectory.c_str(), static_cast<int>(executableDirectory.Native().size()));
             return true;
         }
 

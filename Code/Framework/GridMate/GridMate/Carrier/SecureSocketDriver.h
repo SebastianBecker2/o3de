@@ -19,13 +19,15 @@
 #define AZ_DebugSecureSocket(...)
 #define AZ_DebugSecureSocketConnection(window, fmt, ...)
 
-//#define AZ_DebugUseSocketDebugLog
-//#define AZ_DebugSecureSocket AZ_TracePrintf
-//#define AZ_DebugSecureSocketConnection(window, fmt, ...) \
-//{\
-//    GridMate::string line = GridMate::string::format(fmt, __VA_ARGS__);\
-//    this->m_dbgLog += line;\
-//}
+/*
+  #define AZ_DebugUseSocketDebugLog
+  #define AZ_DebugSecureSocket AZ_TracePrintf
+  #define AZ_DebugSecureSocketConnection(window, fmt, ...) \
+  {\
+      AZStd::string line = AZStd::string::format(fmt, __VA_ARGS__);\
+      this->m_dbgLog += line;\
+  }
+*/
 
 #if AZ_TRAIT_GRIDMATE_SECURE_SOCKET_DRIVER_HOOK_ENABLED
 struct ssl_st;
@@ -226,7 +228,7 @@ namespace GridMate
             int m_dbgDgramsReceived;
             int m_dbgPort;
 #ifdef AZ_DebugUseSocketDebugLog
-            GridMate::string m_dbgLog;
+            AZStd::string m_dbgLog;
 #endif
         };
 
@@ -262,7 +264,7 @@ namespace GridMate
         AZ::u32 m_maxTempBufferSize;
         AZStd::queue<DatagramAddr> m_globalInQueue;
         AZStd::unordered_map<SocketDriverAddress, Connection*, SocketDriverAddress::Hasher> m_connections;
-        AZStd::unordered_map<string, int> m_ipToNumConnections;
+        AZStd::unordered_map<AZStd::string, int> m_ipToNumConnections;
         SecureSocketDesc m_desc;
         AZStd::chrono::system_clock::time_point m_lastTimerCheck;       ///Time last timers were checked
     };

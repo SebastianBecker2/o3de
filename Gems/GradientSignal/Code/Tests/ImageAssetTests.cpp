@@ -11,6 +11,7 @@
 #include <AzCore/Component/ComponentApplication.h>
 #include <GradientSignal/GradientImageConversion.h>
 #include <AzCore/UnitTest/UnitTest.h>
+#include <AzCore/UnitTest/TestTypes.h>
 
 #include <limits>
 
@@ -40,7 +41,7 @@ namespace
 
             asset.m_imageWidth = dimensions;
             asset.m_imageHeight = dimensions;
-            asset.m_bytesPerPixel = bytesPerPixel;
+            asset.m_bytesPerPixel = static_cast<AZ::u8>(bytesPerPixel);
             asset.m_imageFormat = format;
             asset.m_imageData.resize(asset.m_bytesPerPixel * asset.m_imageWidth * asset.m_imageHeight);
 
@@ -64,26 +65,8 @@ namespace
         }
     }
 
-    class ImageAssetTest
-        : public ::testing::Test
+    class ImageAssetTest : public ::testing::Test
     {
-    protected:
-        AZ::ComponentApplication m_app;
-        AZ::Entity* m_systemEntity = nullptr;
-
-        void SetUp() override
-        {
-            AZ::ComponentApplication::Descriptor appDesc;
-            appDesc.m_memoryBlocksByteSize = 128 * 1024 * 1024;
-            m_systemEntity = m_app.Create(appDesc);
-            m_app.AddEntity(m_systemEntity);
-        }
-
-        void TearDown() override
-        {
-            m_app.Destroy();
-            m_systemEntity = nullptr;
-        }
     };
 
 #if AZ_TRAIT_DISABLE_FAILED_GRADIENT_SIGNAL_TESTS
@@ -111,7 +94,10 @@ namespace
         constexpr auto numChannels = 1;
         constexpr auto bytesPerPixel = numChannels * sizeof(AZ::u8);
         constexpr auto outputSize = imageDimensions * imageDimensions;
-        constexpr auto scaling = 25;
+        // Adjust the test scale so that none of the input data overflows the cast to AZ::u8. 
+        // The overflow behavior when casting from float to uint8 is undefined so we want to 
+        // avoid that consistently across all platforms
+        constexpr auto scaling = 255.0f / aznumeric_cast<float>(imageDimensions * imageDimensions);
 
         auto inputData = Detail::GenerateInput<AZ::u8, imageDimensions, numChannels>(scaling);
 

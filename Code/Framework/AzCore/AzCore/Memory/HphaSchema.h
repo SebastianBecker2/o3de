@@ -19,7 +19,7 @@ namespace AZ
     * Heap allocator schema, based on Dimitar Lazarov "High Performance Heap Allocator".
     */
     class HphaSchema
-        : public IAllocatorAllocate
+        : public IAllocatorSchema
     {
     public:
         /**
@@ -47,7 +47,7 @@ namespace AZ
             unsigned int            m_isPoolAllocations : 1;                ///< True to allow allocations from pools, otherwise false.
             size_t                  m_fixedMemoryBlockByteSize;             ///< Memory block size, if 0 we use the OS memory allocation functions.
             void*                   m_fixedMemoryBlock;                     ///< Can be NULL if so the we will allocate memory from the subAllocator if m_memoryBlocksByteSize is != 0.
-            IAllocatorAllocate*     m_subAllocator;                         ///< Allocator that m_memoryBlocks memory was allocated from or should be allocated (if NULL).
+            IAllocatorSchema*       m_subAllocator;                         ///< Allocator that m_memoryBlocks memory was allocated from or should be allocated (if NULL).
             size_t                  m_systemChunkSize;                      ///< Size of chunk to request from the OS when more memory is needed (defaults to m_pageSize)
             size_t                  m_capacity;                             ///< Max size this allocator can grow to
         };
@@ -56,21 +56,21 @@ namespace AZ
         HphaSchema(const Descriptor& desc);
         virtual ~HphaSchema();
 
-        virtual pointer_type    Allocate(size_type byteSize, size_type alignment, int flags = 0, const char* name = 0, const char* fileName = 0, int lineNum = 0, unsigned int suppressStackRecord = 0);
-        virtual void            DeAllocate(pointer_type ptr, size_type byteSize = 0, size_type alignment = 0);
-        virtual pointer_type    ReAllocate(pointer_type ptr, size_type newSize, size_type newAlignment);
+        pointer_type    Allocate(size_type byteSize, size_type alignment, int flags = 0, const char* name = 0, const char* fileName = 0, int lineNum = 0, unsigned int suppressStackRecord = 0) override;
+        void            DeAllocate(pointer_type ptr, size_type byteSize = 0, size_type alignment = 0) override;
+        pointer_type    ReAllocate(pointer_type ptr, size_type newSize, size_type newAlignment) override;
         /// Resizes allocated memory block to the size possible and returns that size.
-        virtual size_type       Resize(pointer_type ptr, size_type newSize);
-        virtual size_type       AllocationSize(pointer_type ptr);
+        size_type       Resize(pointer_type ptr, size_type newSize) override;
+        size_type       AllocationSize(pointer_type ptr) override;
 
-        virtual size_type       NumAllocatedBytes() const;
-        virtual size_type       Capacity() const;
-        virtual size_type       GetMaxAllocationSize() const;
-        virtual size_type       GetUnAllocatedMemory(bool isPrint = false) const;
-        virtual IAllocatorAllocate* GetSubAllocator()                       { return m_desc.m_subAllocator; }
+        size_type       NumAllocatedBytes() const override;
+        size_type       Capacity() const override;
+        size_type       GetMaxAllocationSize() const override;
+        size_type       GetMaxContiguousAllocationSize() const override;
+        size_type       GetUnAllocatedMemory(bool isPrint = false) const override;
 
         /// Return unused memory to the OS (if we don't use fixed block). Don't call this unless you really need free memory, it is slow.
-        virtual void            GarbageCollect();
+        void            GarbageCollect() override;
 
     private:
         // [LY-84974][sconel@][2018-08-10] SliceStrike integration up to CL 671758

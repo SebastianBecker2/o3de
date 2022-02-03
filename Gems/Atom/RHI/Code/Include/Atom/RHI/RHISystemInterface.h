@@ -8,11 +8,14 @@
 
 #pragma once
 
+#include <AzCore/Debug/Budget.h>
 #include <AzCore/Name/Name.h>
 #include <AzCore/EBus/EBus.h>
 #include <Atom/RHI.Reflect/FrameSchedulerEnums.h>
 #include <Atom/RHI.Reflect/MemoryStatistics.h>
 #include <Atom/RHI/DrawListTagRegistry.h>
+
+AZ_DECLARE_BUDGET(RHI);
 
 namespace AZ
 {
@@ -23,8 +26,8 @@ namespace AZ
         class PipelineState;
         class PipelineStateCache;
         class PlatformLimitsDescriptor;
+        class PhysicalDeviceDescriptor;
         class RayTracingShaderTable;
-        struct CpuTimingStatistics;
         struct FrameSchedulerCompileRequest;
         struct TransientAttachmentStatistics;
         struct TransientAttachmentPoolDescriptor;
@@ -52,7 +55,7 @@ namespace AZ
 
             virtual void ModifyFrameSchedulerStatisticsFlags(RHI::FrameSchedulerStatisticsFlags statisticsFlags, bool enableFlags) = 0;
 
-            virtual const RHI::CpuTimingStatistics* GetCpuTimingStatistics() const = 0;
+            virtual double GetCpuFrameTime() const = 0;
 
             virtual const RHI::TransientAttachmentStatistics* GetTransientAttachmentStatistics() const = 0;
 
@@ -63,6 +66,8 @@ namespace AZ
             virtual ConstPtr<PlatformLimitsDescriptor> GetPlatformLimitsDescriptor() const = 0;
 
             virtual void QueueRayTracingShaderTableForBuild(RayTracingShaderTable* rayTracingShaderTable) = 0;
+            
+            virtual const PhysicalDeviceDescriptor& GetPhysicalDeviceDescriptor() = 0;
         };
 
         //! This bus exists to give RHI samples the ability to slot in scopes manually

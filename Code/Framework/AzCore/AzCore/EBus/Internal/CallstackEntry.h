@@ -84,7 +84,7 @@ namespace AZ
                 else
                 {
                     AZ::Debug::Trace::Instance().Assert(__FILE__, __LINE__, AZ_FUNCTION_SIGNATURE,
-                        "Bus has multiple threads in its callstack records. Configure MutexType on the bus, or don't send to it from multiple threads");
+                        "Bus %s has multiple threads in its callstack records. Configure MutexType on the bus, or don't send to it from multiple threads", BusType::GetName());
                 }
             }
 
@@ -161,7 +161,7 @@ namespace AZ
         template <class C>
         struct EBusCallstackStorage<C, true>
         {
-            AZ_THREAD_LOCAL static C* s_entry;
+            static AZ_THREAD_LOCAL C* s_entry;
 
             EBusCallstackStorage() = default;
             ~EBusCallstackStorage() = default;

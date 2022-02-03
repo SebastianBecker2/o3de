@@ -6,9 +6,9 @@
  *
  */
 
-#include <Atom/Viewport/MaterialViewportSettings.h>
 #include <AzCore/RTTI/BehaviorContext.h>
 #include <AzCore/Serialization/EditContext.h>
+#include <Viewport/MaterialViewportSettings.h>
 
 namespace MaterialEditor
 {
@@ -54,7 +54,7 @@ namespace MaterialEditor
             behaviorContext->Class<MaterialViewportSettings>("MaterialViewportSettings")
                 ->Attribute(AZ::Script::Attributes::Scope, AZ::Script::Attributes::ScopeFlags::Common)
                 ->Attribute(AZ::Script::Attributes::Category, "Editor")
-                ->Attribute(AZ::Script::Attributes::Module, "render")
+                ->Attribute(AZ::Script::Attributes::Module, "materialeditor")
                 ->Constructor()
                 ->Constructor<const MaterialViewportSettings&>()
                 ->Property("enableGrid", BehaviorValueProperty(&MaterialViewportSettings::m_enableGrid))

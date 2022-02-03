@@ -37,7 +37,6 @@
 
 #include <Data/Data.h>
 
-#include <Editor/Assets/ScriptCanvasAssetTrackerBus.h>
 #include <Editor/GraphCanvas/GraphCanvasEditorNotificationBusId.h>
 #include <Editor/QtMetaTypes.h>
 #include <Editor/Settings.h>
@@ -52,6 +51,7 @@
 #include <ScriptCanvas/Data/DataRegistry.h>
 #include <ScriptCanvas/GraphCanvas/NodeDescriptorBus.h>
 #include <ScriptCanvas/Asset/RuntimeAsset.h>
+#include "GraphCanvas/Components/Slots/Data/DataSlotBus.h"
 
 namespace ScriptCanvasEditor
 {
@@ -120,7 +120,6 @@ namespace ScriptCanvasEditor
             m_variableName = m_variable->GetVariableName();
 
             const AZStd::string variableTypeName = TranslationHelper::GetSafeTypeName(m_variable->GetDatum()->GetType());
-            m_variable->SetDisplayName(variableTypeName);
 
             m_componentTitle = AZStd::string::format("%s Variable", variableTypeName.data());
 
@@ -259,7 +258,7 @@ namespace ScriptCanvasEditor
 
         QObject::connect(pasteAction,
             &QAction::triggered,
-            [dockWidget, varId](bool)
+            [dockWidget](bool)
         {
             GraphVariablesTableView::HandleVariablePaste(dockWidget->GetActiveScriptCanvasId());
         });
@@ -886,6 +885,7 @@ namespace ScriptCanvasEditor
                     bool removedReferences = false;
 
                     ScriptCanvas::NodeRequestBus::EventResult(removedReferences, memberPair.m_scriptCanvasId, &ScriptCanvas::NodeRequests::RemoveVariableReferences, variableIds);
+
 
                     // If we didn't remove the references. Just delete the node.
                     if (!removedReferences)

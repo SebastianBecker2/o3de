@@ -104,7 +104,7 @@ namespace CommandSystem
         RegisterCommand(new CommandMotionSetAdjustMotion());
 
         // register node group commands
-        RegisterCommand(new CommandAdjustNodeGroup());
+        RegisterCommand(aznew CommandAdjustNodeGroup());
         RegisterCommand(new CommandAddNodeGroup());
         RegisterCommand(new CommandRemoveNodeGroup());
 
@@ -134,7 +134,7 @@ namespace CommandSystem
         RegisterCommand(aznew CommandAdjustTransitionCondition());
         RegisterCommand(new CommandAnimGraphAddNodeGroup());
         RegisterCommand(new CommandAnimGraphRemoveNodeGroup());
-        RegisterCommand(new CommandAnimGraphAdjustNodeGroup());
+        RegisterCommand(aznew CommandAnimGraphAdjustNodeGroup());
         RegisterCommand(new CommandAnimGraphAddGroupParameter());
         RegisterCommand(new CommandAnimGraphRemoveGroupParameter());
         RegisterCommand(new CommandAnimGraphAdjustGroupParameter());
@@ -147,8 +147,8 @@ namespace CommandSystem
         RegisterCommand(new CommandRecorderClear());
 
         gCommandManager     = this;
-        mLockSelection      = false;
-        mWorkspaceDirtyFlag = false;
+        m_lockSelection      = false;
+        m_workspaceDirtyFlag = false;
     }
 
     CommandManager::~CommandManager()

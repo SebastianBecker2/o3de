@@ -23,6 +23,7 @@
 #include <EMotionFX/CommandSystem/Source/CommandManager.h>
 #include <EMotionFX/CommandSystem/Source/MotionSetCommands.h>
 #include <EMotionFX/Source/ActorManager.h>
+#include <EMotionFX/Tools/EMotionStudio/Plugins/RenderPlugins/Source/OpenGLRender/OpenGLRenderPlugin.h>
 
 #include <AzCore/IO/Path/Path.h>
 #include <AzCore/Settings/SettingsRegistryMergeUtils.h>
@@ -38,7 +39,7 @@ namespace EMStudio
 {
     Workspace::Workspace()
     {
-        mDirtyFlag = false;
+        m_dirtyFlag = false;
     }
 
 
@@ -105,7 +106,9 @@ namespace EMStudio
             }
         }
 
-        commandString = AZStd::string::format("%s -filename \"%s\"", command, resultFileName.c_str());
+        AZStd::string resultFilenameString = resultFileName.c_str();
+        AzFramework::StringFunc::AssetDatabasePath::Normalize(resultFilenameString);
+        commandString = AZStd::string::format("%s -filename \"%s\"", command, resultFilenameString.c_str());
 
         if (additionalParameters)
         {
@@ -139,15 +142,15 @@ namespace EMStudio
         ActivationIndicesByActorInstance activationIndicesByActorInstance;
         int32 commandIndex = 0;
 
-        const uint32 numActorInstances = EMotionFX::GetActorManager().GetNumActorInstances();
+        const size_t numActorInstances = EMotionFX::GetActorManager().GetNumActorInstances();
 
         // actors
-        const uint32 numActors = EMotionFX::GetActorManager().GetNumActors();
-        for (uint32 i = 0; i < numActors; ++i)
+        const size_t numActors = EMotionFX::GetActorManager().GetNumActors();
+        for (size_t i = 0; i < numActors; ++i)
         {
             EMotionFX::Actor* actor = EMotionFX::GetActorManager().GetActor(i);
 
-            for (uint32 j = 0; j < numActorInstances; ++j)
+            for (size_t j = 0; j < numActorInstances; ++j)
             {
                 EMotionFX::ActorInstance* actorInstance = EMotionFX::GetActorManager().GetActorInstance(j);
                 if (actorInstance->GetActor() != actor)
@@ -161,11 +164,11 @@ namespace EMStudio
                 }
 
                 const EMotionFX::Transform& transform = actorInstance->GetLocalSpaceTransform();
-                const AZ::Vector3&       pos     = transform.mPosition;
-                const AZ::Quaternion&    rot     = transform.mRotation;
+                const AZ::Vector3&       pos     = transform.m_position;
+                const AZ::Quaternion&    rot     = transform.m_rotation;
 
                 #ifndef EMFX_SCALE_DISABLED
-                    const AZ::Vector3& scale = transform.mScale;
+                    const AZ::Vector3& scale = transform.m_scale;
                 #else
                     const AZ::Vector3 scale = AZ::Vector3::CreateOne();
                 #endif
@@ -184,7 +187,7 @@ namespace EMStudio
         }
 
         // attachments
-        for (uint32 i = 0; i < numActorInstances; ++i)
+        for (size_t i = 0; i < numActorInstances; ++i)
         {
             EMotionFX::ActorInstance* actorInstance = EMotionFX::GetActorManager().GetActorInstance(i);
 
@@ -197,23 +200,23 @@ namespace EMStudio
             {
                 EMotionFX::Attachment*      attachment                  = actorInstance->GetSelfAttachment();
                 EMotionFX::ActorInstance*   attachedToActorInstance     = attachment->GetAttachToActorInstance();
-                const uint32                attachedToInstanceIndex     = EMotionFX::GetActorManager().FindActorInstanceIndex(attachedToActorInstance);
-                const uint32                attachtmentInstanceIndex    = EMotionFX::GetActorManager().FindActorInstanceIndex(actorInstance);
+                const size_t                attachedToInstanceIndex     = EMotionFX::GetActorManager().FindActorInstanceIndex(attachedToActorInstance);
+                const size_t                attachtmentInstanceIndex    = EMotionFX::GetActorManager().FindActorInstanceIndex(actorInstance);
 
                 if (actorInstance->GetIsSkinAttachment())
                 {
-                    commandString = AZStd::string::format("AddDeformableAttachment -attachmentIndex %d -attachToIndex %d\n", attachtmentInstanceIndex, attachedToInstanceIndex);
+                    commandString = AZStd::string::format("AddDeformableAttachment -attachmentIndex %zu -attachToIndex %zu\n", attachtmentInstanceIndex, attachedToInstanceIndex);
                     commands += commandString;
                     ++commandIndex;
                 }
                 else
                 {
                     EMotionFX::AttachmentNode*  attachmentSingleNode    = static_cast<EMotionFX::AttachmentNode*>(attachment);
-                    const uint32                attachedToNodeIndex     = attachmentSingleNode->GetAttachToNodeIndex();
+                    const size_t                attachedToNodeIndex     = attachmentSingleNode->GetAttachToNodeIndex();
                     EMotionFX::Actor*           attachedToActor         = attachedToActorInstance->GetActor();
                     EMotionFX::Node*            attachedToNode          = attachedToActor->GetSkeleton()->GetNode(attachedToNodeIndex);
 
-                    commandString = AZStd::string::format("AddAttachment -attachmentIndex %d -attachToIndex %d -attachToNode \"%s\"\n", attachtmentInstanceIndex, attachedToInstanceIndex, attachedToNode->GetName());
+                    commandString = AZStd::string::format("AddAttachment -attachmentIndex %zu -attachToIndex %zu -attachToNode \"%s\"\n", attachtmentInstanceIndex, attachedToInstanceIndex, attachedToNode->GetName());
                     commands += commandString;
                     ++commandIndex;
                 }
@@ -221,9 +224,9 @@ namespace EMStudio
         }
 
         // motion sets
-        const uint32 numRootMotionSets = EMotionFX::GetMotionManager().CalcNumRootMotionSets();
+        const size_t numRootMotionSets = EMotionFX::GetMotionManager().CalcNumRootMotionSets();
         AZStd::unordered_set<EMotionFX::Motion*> motionsInMotionSets;
-        for (uint32 i = 0; i < numRootMotionSets; ++i)
+        for (size_t i = 0; i < numRootMotionSets; ++i)
         {
             EMotionFX::MotionSet* motionSet = EMotionFX::GetMotionManager().FindRootMotionSet(i);
 
@@ -255,8 +258,8 @@ namespace EMStudio
         }
 
         // motions that are not in the above motion sets
-        const uint32 numMotions = EMotionFX::GetMotionManager().GetNumMotions();
-        for (uint32 i = 0; i < numMotions; ++i)
+        const size_t numMotions = EMotionFX::GetMotionManager().GetNumMotions();
+        for (size_t i = 0; i < numMotions; ++i)
         {
             EMotionFX::Motion* motion = EMotionFX::GetMotionManager().GetMotion(i);
 
@@ -277,8 +280,8 @@ namespace EMStudio
         // We need to avoid storing two times the same anim graph. This could happen if the anim graph was loaded from a reference
         // node. We need to integrate the asset system into the AnimGraphManager
         AZStd::unordered_set<AZStd::string> animGraphFilenames;
-        const uint32 numAnimGraphs = EMotionFX::GetAnimGraphManager().GetNumAnimGraphs();
-        for (uint32 i = 0; i < numAnimGraphs; ++i)
+        const size_t numAnimGraphs = EMotionFX::GetAnimGraphManager().GetNumAnimGraphs();
+        for (size_t i = 0; i < numAnimGraphs; ++i)
         {
             EMotionFX::AnimGraph* animGraph = EMotionFX::GetAnimGraphManager().GetAnimGraph(i);
 
@@ -317,7 +320,7 @@ namespace EMStudio
         }
 
         // activate anim graph for each actor instance
-        for (uint32 i = 0; i < numActorInstances; ++i)
+        for (size_t i = 0; i < numActorInstances; ++i)
         {
             EMotionFX::ActorInstance* actorInstance = EMotionFX::GetActorManager().GetActorInstance(i);
 
@@ -371,14 +374,14 @@ namespace EMStudio
             // update the workspace filename
             if (updateFileName)
             {
-                mFilename = filename;
+                m_filename = filename;
             }
 
             // update the workspace dirty flag
             if (updateDirtyFlag)
             {
                 GetCommandManager()->SetWorkspaceDirtyFlag(false);
-                mDirtyFlag = false;
+                m_dirtyFlag = false;
             }
 
             // save succeeded
@@ -404,7 +407,7 @@ namespace EMStudio
 
         QSettings settings(filename, QSettings::IniFormat, (QWidget*)GetManager()->GetMainWindow());
 
-        mFilename       = filename;
+        m_filename       = filename;
 
         AZStd::string commandsString = FromQtString(settings.value("startScript", "").toString());
 
@@ -428,30 +431,48 @@ namespace EMStudio
                 continue;
             }
 
-            AzFramework::StringFunc::Replace(commands[i], "@assets@/", assetCacheFolder.c_str(), true /* case sensitive */);
+            // Temp solution after we refactor / remove the actor manager.
+            // We only need to create the actor instance by ourselves when openGLRenderPlugin is present.
+            // Atom render viewport will create actor instance along with the actor component.
+            PluginManager* pluginManager = GetPluginManager();
+            if (!pluginManager->FindActivePlugin(static_cast<uint32>(OpenGLRenderPlugin::CLASS_ID)))
+            {
+                if (commands[i].find("CreateActorInstance") == 0)
+                {
+                    continue;
+                }
+            }
+
+            AzFramework::StringFunc::Replace(commands[i], "@products@", assetCacheFolder.c_str());
+            AzFramework::StringFunc::Replace(commands[i], "@assets@", assetCacheFolder.c_str());
+            AzFramework::StringFunc::Replace(commands[i], "@root@", assetCacheFolder.c_str());
+            AzFramework::StringFunc::Replace(commands[i], "@projectplatformcache@", assetCacheFolder.c_str());
+            AzFramework::StringFunc::Replace(commands[i], "//", AZ_CORRECT_FILESYSTEM_SEPARATOR_STRING);
+            AzFramework::StringFunc::Replace(commands[i], "\\\\", AZ_CORRECT_FILESYSTEM_SEPARATOR_STRING);
+            AzFramework::StringFunc::Replace(commands[i], "/\\", AZ_CORRECT_FILESYSTEM_SEPARATOR_STRING);
 
             // add the command to the command group
             commandGroup->AddCommandString(commands[i]);
         }
 
         GetCommandManager()->SetWorkspaceDirtyFlag(false);
-        mDirtyFlag = false;
+        m_dirtyFlag = false;
         return true;
     }
 
 
     void Workspace::Reset()
     {
-        mFilename.clear();
+        m_filename.clear();
 
         GetCommandManager()->SetWorkspaceDirtyFlag(false);
-        mDirtyFlag = false;
+        m_dirtyFlag = false;
     }
 
 
     bool Workspace::GetDirtyFlag() const
     {
-        if (mDirtyFlag)
+        if (m_dirtyFlag)
         {
             return true;
         }
@@ -467,7 +488,7 @@ namespace EMStudio
 
     void Workspace::SetDirtyFlag(bool dirty)
     {
-        mDirtyFlag = dirty;
+        m_dirtyFlag = dirty;
         GetCommandManager()->SetWorkspaceDirtyFlag(dirty);
     }
 } // namespace EMStudio

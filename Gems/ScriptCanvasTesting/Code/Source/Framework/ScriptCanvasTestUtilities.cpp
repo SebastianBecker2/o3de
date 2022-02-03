@@ -6,13 +6,11 @@
  *
  */
 
-#include <ScriptCanvas/Assets/ScriptCanvasAssetHandler.h>
 #include <Asset/EditorAssetSystemComponent.h>
 #include <AzCore/Asset/AssetManagerBus.h>
 #include <AzCore/Component/TickBus.h>
 #include <AzCore/IO/FileIO.h>
 #include <AzCore/IO/IOUtils.h>
-#include <AzCore/IO/FileIOEventBus.h>
 #include <AzCore/UnitTest/UnitTest.h>
 #include <AzFramework/API/ApplicationAPI.h>
 #include <Editor/Framework/ScriptCanvasGraphUtilities.h>
@@ -33,14 +31,6 @@ namespace ScriptCanvasTestUtilitiesCPP
 namespace ScriptCanvasTests
 {
     using namespace ScriptCanvas;
-
-#define SC_CORE_UNIT_TEST_DIR "@engroot@/LY_SC_UnitTest_ScriptCanvas_CoreCPP_Temporary"
-#define SC_CORE_UNIT_TEST_NAME "serializationTest.scriptcanvas_compiled"
-    const char* k_tempCoreAssetDir = SC_CORE_UNIT_TEST_DIR;
-    const char* k_tempCoreAssetName = SC_CORE_UNIT_TEST_NAME;
-    const char* k_tempCoreAssetPath = SC_CORE_UNIT_TEST_DIR "/" SC_CORE_UNIT_TEST_NAME;
-#undef SC_CORE_UNIT_TEST_DIR
-#undef SC_CORE_UNIT_TEST_NAME
 
     void ExpectParse(AZStd::string_view graphPath)
     {

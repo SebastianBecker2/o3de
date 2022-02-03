@@ -160,7 +160,7 @@ namespace AtomToolsFramework
                 ApplyRangeEditDataAttributes<float>();
                 break;
             case DynamicPropertyType::Color:
-                AddEditDataAttribute(AZ_CRC("ColorEditorConfiguration", 0xc8b9510e), AZ::RPI::ColorUtils::GetLinearRgbEditorConfig());
+                AddEditDataAttribute(AZ_CRC_CE("ColorEditorConfiguration"), AZ::RPI::ColorUtils::GetRgbEditorConfig());
                 break;
             case DynamicPropertyType::Enum:
                 m_editData.m_elementId = AZ::Edit::UIHandlers::ComboBox;
@@ -192,7 +192,7 @@ namespace AtomToolsFramework
 
     AZStd::string DynamicProperty::GetDisplayName() const
     {
-        return !m_config.m_displayName.empty() ? m_config.m_displayName : m_config.m_nameId;
+        return !m_config.m_displayName.empty() ? m_config.m_displayName : m_config.m_name;
     }
 
     AZStd::string DynamicProperty::GetGroupName() const

@@ -63,6 +63,13 @@ namespace Camera
         //! @return The camera frustum's height
         virtual float GetFrustumHeight() = 0;
 
+        //! Gets whether or not the camera is using an orthographic projection.
+        //! @return True if the camera is using an orthographic projection, or false if the camera is using a perspective projection.
+        virtual bool IsOrthographic() = 0;
+
+        //! @return The half width of the orthographic projection, @see SetOrthographicHalfWidth.
+        virtual float GetOrthographicHalfWidth() = 0;
+
         //! Sets the camera's field of view in degrees between 0 < fov < 180 degrees
         //! @param fov The camera frustum's new field of view in degrees
         virtual void SetFov(float fov)
@@ -95,8 +102,20 @@ namespace Camera
         //! @param height The camera frustum's new height
         virtual void SetFrustumHeight(float height) = 0;
 
+        //! Sets whether or not the camera should use an orthographic projection in place of a perspective projection.
+        //! @param orthographic If true, the camera will use an orthographic projection
+        virtual void SetOrthographic(bool orthographic) = 0;
+
+        //! Sets the half-width of the orthographic projection.
+        //! @params halfWidth Used to calculate the bounds of the projection while in orthographic mode.
+        //! The height is calculated automatically based on the aspect ratio.
+        virtual void SetOrthographicHalfWidth(float halfWidth) = 0;
+
         //! Makes the camera the active view
         virtual void MakeActiveView() = 0;
+
+        //! Check if this camera is the active render camera
+        virtual bool IsActiveView() = 0;
 
         //! Get the camera frustum's aggregate configuration
         virtual Configuration GetCameraConfiguration() 
@@ -110,6 +129,32 @@ namespace Camera
                 GetFrustumHeight()
             };
         }
+
+        //! Unprojects a position in screen space pixel coordinates to world space.
+        //! With a depth of zero, the position returned will be on the near clip plane of the camera
+        //! in world space.
+        //! @param screenPosition The absolute screen position
+        //! @param depth The depth offset into the world relative to the near clip plane of the camera 
+        //! @return the position in world space
+        virtual AZ::Vector3 ScreenToWorld(const AZ::Vector2& screenPosition, float depth) = 0;
+
+        //! Unprojects a position in screen space normalized device coordinates to world space.
+        //! With a depth of zero, the position returned will be on the near clip plane of the camera
+        //! in world space.
+        //! @param screenNdcPosition The normalized device coordinates in the range [0,1]
+        //! @param depth The depth offset into the world relative to the near clip plane of the camera 
+        //! @return the position in world space
+        virtual AZ::Vector3 ScreenNdcToWorld(const AZ::Vector2& screenNdcPosition, float depth) = 0;
+
+        //! Projects a position in world space to screen space for the given camera.
+        //! @param worldPosition The world position
+        //! @return The absolute screen position
+        virtual AZ::Vector2 WorldToScreen(const AZ::Vector3& worldPosition) = 0;
+
+        //! Projects a position in world space to screen space normalized device coordinates.
+        //! @param worldPosition The world position
+        //! @return The normalized device coordinates in the range [0,1]
+        virtual AZ::Vector2 WorldToScreenNdc(const AZ::Vector3& worldPosition) = 0;
     };
     using CameraRequestBus = AZ::EBus<CameraComponentRequests>;
 

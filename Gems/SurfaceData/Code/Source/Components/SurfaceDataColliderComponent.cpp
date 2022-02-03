@@ -132,6 +132,7 @@ namespace SurfaceData
         Physics::ColliderComponentEventBus::Handler::BusConnect(GetEntityId());
 
         // Update the cached collider data and bounds, then register the surface data provider / modifier
+        AssignSurfaceTagWeights(m_configuration.m_providerTags, 1.0f, m_newPointWeights);
         UpdateColliderData();
     }
 
@@ -157,7 +158,7 @@ namespace SurfaceData
 
         // Clear the cached mesh data
         {
-            AZStd::lock_guard<decltype(m_cacheMutex)> lock(m_cacheMutex);
+            AZStd::unique_lock<decltype(m_cacheMutex)> lock(m_cacheMutex);
             m_colliderBounds = AZ::Aabb::CreateNull();
         }
     }
@@ -184,9 +185,7 @@ namespace SurfaceData
 
     bool SurfaceDataColliderComponent::DoRayTrace(const AZ::Vector3& inPosition, bool queryPointOnly, AZ::Vector3& outPosition, AZ::Vector3& outNormal) const
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::Entity);
-
-        AZStd::lock_guard<decltype(m_cacheMutex)> lock(m_cacheMutex);
+        AZStd::shared_lock<decltype(m_cacheMutex)> lock(m_cacheMutex);
 
         // test AABB as first pass to claim the point
         const AZ::Vector3 testPosition = AZ::Vector3(
@@ -242,16 +241,14 @@ namespace SurfaceData
             point.m_entityId = GetEntityId();
             point.m_position = hitPosition;
             point.m_normal = hitNormal;
-            AddMaxValueForMasks(point.m_masks, m_configuration.m_providerTags, 1.0f);
-            surfacePointList.push_back(point);
+            point.m_masks = m_newPointWeights;
+            surfacePointList.push_back(AZStd::move(point));
         }
     }
 
     void SurfaceDataColliderComponent::ModifySurfacePoints(SurfacePointList& surfacePointList) const
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::Entity);
-
-        AZStd::lock_guard<decltype(m_cacheMutex)> lock(m_cacheMutex);
+        AZStd::shared_lock<decltype(m_cacheMutex)> lock(m_cacheMutex);
 
         if (m_colliderBounds.IsValid() && !m_configuration.m_modifierTags.empty())
         {
@@ -303,13 +300,13 @@ namespace SurfaceData
 
     void SurfaceDataColliderComponent::UpdateColliderData()
     {
-        AZ_PROFILE_FUNCTION(AZ::Debug::ProfileCategory::Entity);
+        AZ_PROFILE_FUNCTION(Entity);
 
         bool colliderValidBeforeUpdate = false;
         bool colliderValidAfterUpdate = false;
 
         {
-            AZStd::lock_guard<decltype(m_cacheMutex)> lock(m_cacheMutex);
+            AZStd::unique_lock<decltype(m_cacheMutex)> lock(m_cacheMutex);
 
             colliderValidBeforeUpdate = m_colliderBounds.IsValid();
 

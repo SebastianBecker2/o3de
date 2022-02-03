@@ -79,7 +79,8 @@ namespace AzNetworking
             AZLOG(NET_Acks, "Unacked packet count exceeded, sending client heartbeat (curr %u : max %u)", m_unackedPacketCount, static_cast<uint32_t>(net_UdpMaxUnackedPacketCount));
             // This simply times out unreliable chunks that haven't completed within our timeout delay
             m_fragmentQueue.Update();
-            SendUnreliablePacket(CorePackets::HeartbeatPacket());
+            // This heartbeat is sent to minimize the time the remote endpoint spends waiting for ack vector replication, we don't require a response
+            SendUnreliablePacket(CorePackets::HeartbeatPacket(false));
         }
     }
 
@@ -152,7 +153,7 @@ namespace AzNetworking
 
     void UdpConnection::ProcessAcked(PacketId packetId, AZ::TimeMs currentTimeMs)
     {
-        GetMetrics().m_packetsAcked++;
+        GetMetrics().LogPacketAcked();
         m_reliableQueue.OnPacketAcked(m_networkInterface, *this, packetId);
 
         // Compute Rtt adjustments
@@ -172,8 +173,7 @@ namespace AzNetworking
             GetMetrics().m_connectionRtt.LogPacketSent(packetId, currentTimeMs);
         }
 
-        GetMetrics().m_packetsSent++;
-        GetMetrics().m_sendDatarate.LogPacket(packetSize, currentTimeMs);
+        GetMetrics().LogPacketSent(packetSize, currentTimeMs);
         m_lastSentPacketMs = currentTimeMs;
         m_unackedPacketCount = 0;
     }
@@ -193,7 +193,7 @@ namespace AzNetworking
             return PacketTimeoutResult::Acked;
 
         case PacketAckState::Nacked:
-            GetMetrics().m_packetsLost++;
+            GetMetrics().LogPacketLost();
             if (reliability == ReliabilityType::Reliable)
             {
                 m_reliableQueue.OnPacketLost(m_networkInterface, *this, packetId);
@@ -224,8 +224,7 @@ namespace AzNetworking
             return false;
         }
 
-        GetMetrics().m_packetsRecv++;
-        GetMetrics().m_recvDatarate.LogPacket(packetSize, currentTimeMs);
+        GetMetrics().LogPacketRecv(packetSize, currentTimeMs);
 
         if (header.GetIsReliable() && !m_reliableQueue.OnPacketReceived(header))
         {
@@ -238,14 +237,14 @@ namespace AzNetworking
         return true;
     }
 
-    bool UdpConnection::HandleCorePacket(IConnectionListener& connectionListener, UdpPacketHeader& header, ISerializer& serializer)
+    PacketDispatchResult UdpConnection::HandleCorePacket(IConnectionListener& connectionListener, UdpPacketHeader& header, ISerializer& serializer)
     {
         switch (static_cast<CorePackets::PacketType>(header.GetPacketType()))
         {
         case CorePackets::PacketType::InitiateConnectionPacket:
         {
             AZLOG(NET_CorePackets, "Received core packet %s", "InitiateConnection");
-            return true;
+            return PacketDispatchResult::Success;
         }
         break;
 
@@ -255,7 +254,7 @@ namespace AzNetworking
             CorePackets::ConnectionHandshakePacket packet;
             if (!serializer.Serialize(packet, "Packet"))
             {
-                return false;
+                return PacketDispatchResult::Failure;
             }
 
             if (m_state != ConnectionState::Connected)
@@ -266,7 +265,7 @@ namespace AzNetworking
                 }
             }
 
-            return true;
+            return PacketDispatchResult::Success;
         }
         break;
 
@@ -276,10 +275,10 @@ namespace AzNetworking
             CorePackets::TerminateConnectionPacket packet;
             if (!serializer.Serialize(packet, "Packet"))
             {
-                return false;
+                return PacketDispatchResult::Failure;
             }
             Disconnect(packet.GetDisconnectReason(), TerminationEndpoint::Remote);
-            return true;
+            return PacketDispatchResult::Success;
         }
         break;
 
@@ -289,10 +288,14 @@ namespace AzNetworking
             CorePackets::HeartbeatPacket packet;
             if (!serializer.Serialize(packet, "Packet"))
             {
-                return false;
+                return PacketDispatchResult::Failure;
             }
-            // Do nothing, we've already processed our ack packets
-            return true;
+            if (packet.GetRequestResponse())
+            {
+                // We're replying to a heartbeat request, we don't want a response
+                SendUnreliablePacket(CorePackets::HeartbeatPacket(false));
+            }
+            return PacketDispatchResult::Success;
         }
         break;
 
@@ -304,6 +307,6 @@ namespace AzNetworking
             AZ_Assert(false, "Unhandled core packet type!");
         }
 
-        return false;
+        return PacketDispatchResult::Failure;
     }
 }

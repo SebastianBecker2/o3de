@@ -13,7 +13,8 @@
 #include <Atom/RPI.Edit/Common/AssetUtils.h>
 #include <Atom/RPI.Edit/Common/JsonFileLoadContext.h>
 #include <Atom/RPI.Edit/Common/JsonReportingHelper.h>
-#include <AtomCore/Serialization/Json/JsonUtils.h>
+#include <Atom/RPI.Edit/Common/JsonUtils.h>
+#include <AzCore/Serialization/Json/JsonUtils.h>
 
 #include <Atom/RPI.Reflect/Image/StreamingImageAsset.h>
 #include <Atom/RPI.Reflect/Material/MaterialAssetCreator.h>
@@ -29,6 +30,7 @@
 #include <AzCore/IO/IOUtils.h>
 #include <AzCore/IO/Path/Path.h>
 #include <AzCore/Serialization/Json/JsonSerialization.h>
+#include <AzCore/Settings/SettingsRegistry.h>
 
 namespace AZ
 {
@@ -36,21 +38,28 @@ namespace AZ
     {
         namespace
         {
-            static constexpr char const MaterialBuilderName[] = "MaterialBuilder";
+            [[maybe_unused]] static constexpr char const MaterialBuilderName[] = "MaterialBuilder";
         }
 
         const char* MaterialBuilder::JobKey = "Atom Material Builder";
+
+        AZStd::string GetBuilderSettingsFingerprint()
+        {
+            return AZStd::string::format("[BuildersShouldFinalizeMaterialAssets=%d]", MaterialUtils::BuildersShouldFinalizeMaterialAssets());
+        }
 
         void MaterialBuilder::RegisterBuilder()
         {
             AssetBuilderSDK::AssetBuilderDesc materialBuilderDescriptor;
             materialBuilderDescriptor.m_name = JobKey;
-            materialBuilderDescriptor.m_version = 107; // ATOM-14918
+            materialBuilderDescriptor.m_version = 117; // new material type file format
             materialBuilderDescriptor.m_patterns.push_back(AssetBuilderSDK::AssetBuilderPattern("*.material", AssetBuilderSDK::AssetBuilderPattern::PatternType::Wildcard));
             materialBuilderDescriptor.m_patterns.push_back(AssetBuilderSDK::AssetBuilderPattern("*.materialtype", AssetBuilderSDK::AssetBuilderPattern::PatternType::Wildcard));
             materialBuilderDescriptor.m_busId = azrtti_typeid<MaterialBuilder>();
             materialBuilderDescriptor.m_createJobFunction = AZStd::bind(&MaterialBuilder::CreateJobs, this, AZStd::placeholders::_1, AZStd::placeholders::_2);
             materialBuilderDescriptor.m_processJobFunction = AZStd::bind(&MaterialBuilder::ProcessJob, this, AZStd::placeholders::_1, AZStd::placeholders::_2);
+
+            materialBuilderDescriptor.m_analysisFingerprint = GetBuilderSettingsFingerprint();
 
             BusConnect(materialBuilderDescriptor.m_busId);
 
@@ -62,24 +71,35 @@ namespace AZ
             BusDisconnect();
         }
 
+        bool MaterialBuilder::ReportMaterialAssetWarningsAsErrors() const
+        {
+            bool warningsAsErrors = false;
+            if (auto settingsRegistry = AZ::SettingsRegistry::Get(); settingsRegistry != nullptr)
+            {
+                settingsRegistry->Get(warningsAsErrors, "/O3DE/Atom/RPI/MaterialBuilder/WarningsAsErrors");
+            }
+            return warningsAsErrors;
+        }
+
         //! Adds all relevant dependencies for a referenced source file, considering that the path might be relative to the original file location or a full asset path.
         //! This will usually include multiple source dependencies and a single job dependency, but will include only source dependencies if the file is not found.
         //! Note the AssetBuilderSDK::JobDependency::m_platformIdentifier will not be set by this function. The calling code must set this value before passing back
-        //! to the AssetBuilderSDK::CreateJobsResponse.
+        //! to the AssetBuilderSDK::CreateJobsResponse. 
         void AddPossibleDependencies(
-            AZStd::string_view currentFilePath, AZStd::string_view referencedParentPath,
-            AZStd::vector<AssetBuilderSDK::SourceFileDependency>& sourceFileDependencies,
-            const char* jobKey, AZStd::vector<AssetBuilderSDK::JobDependency>& jobDependencies)
+            const AZStd::string& currentFilePath,
+            const AZStd::string& referencedParentPath,
+            const char* jobKey,
+            AZStd::vector<AssetBuilderSDK::JobDependency>& jobDependencies)
         {
             bool dependencyFileFound = false;
+            
+            const bool currentFileIsMaterial = AzFramework::StringFunc::Path::IsExtension(currentFilePath.c_str(), MaterialSourceData::Extension);
+            const bool referencedFileIsMaterialType = AzFramework::StringFunc::Path::IsExtension(referencedParentPath.c_str(), MaterialTypeSourceData::Extension);
+            const bool shouldFinalizeMaterialAssets = MaterialUtils::BuildersShouldFinalizeMaterialAssets();
 
             AZStd::vector<AZStd::string> possibleDependencies = RPI::AssetUtils::GetPossibleDepenencyPaths(currentFilePath, referencedParentPath);
             for (auto& file : possibleDependencies)
             {
-                AssetBuilderSDK::SourceFileDependency sourceFileDependency;
-                sourceFileDependency.m_sourceFileDependencyPath = file;
-                sourceFileDependencies.push_back(sourceFileDependency);
-
                 // The first path found is the highest priority, and will have a job dependency, as this is the one
                 // the builder will actually use
                 if (!dependencyFileFound)
@@ -92,8 +112,17 @@ namespace AZ
                     {
                         AssetBuilderSDK::JobDependency jobDependency;
                         jobDependency.m_jobKey = jobKey;
-                        jobDependency.m_type = AssetBuilderSDK::JobDependencyType::Order;
                         jobDependency.m_sourceFile.m_sourceFileDependencyPath = file;
+                        jobDependency.m_type = AssetBuilderSDK::JobDependencyType::Order;
+                        
+                        // If we aren't finalizing material assets, then a normal job dependency isn't needed because the MaterialTypeAsset data won't be used.
+                        // However, we do still need at least an OrderOnce dependency to ensure the Asset Processor knows about the material type asset so the builder can get it's AssetId.
+                        // This can significantly reduce AP processing time when a material type or its shaders are edited.
+                        if (currentFileIsMaterial && referencedFileIsMaterialType && !shouldFinalizeMaterialAssets)
+                        {
+                            jobDependency.m_type = AssetBuilderSDK::JobDependencyType::OrderOnce;
+                        }
+
                         jobDependencies.push_back(jobDependency);
                     }
                 }
@@ -143,7 +172,8 @@ namespace AZ
             // We'll build up this one JobDescriptor and reuse it to register each of the platforms
             AssetBuilderSDK::JobDescriptor outputJobDescriptor;
             outputJobDescriptor.m_jobKey = JobKey;
-            
+            outputJobDescriptor.m_additionalFingerprintInfo = GetBuilderSettingsFingerprint();
+
             // Load the file so we can detect and report dependencies.
             // If the file is a .materialtype, report dependencies on the .shader files.
             // If the file is a .material, report a dependency on the .materialtype and parent .material file
@@ -151,7 +181,7 @@ namespace AZ
                 AZStd::string fullSourcePath;
                 AzFramework::StringFunc::Path::ConstructFull(request.m_watchFolder.data(), request.m_sourceFile.data(), fullSourcePath, true);
 
-                auto loadOutcome = JsonSerializationUtils::ReadJsonFile(fullSourcePath);
+                auto loadOutcome = JsonSerializationUtils::ReadJsonFile(fullSourcePath, AZ::RPI::JsonUtils::DefaultMaxFileSize);
                 if (!loadOutcome.IsSuccess())
                 {
                     AZ_Error(MaterialBuilderName, false, "%s", loadOutcome.GetError().c_str());
@@ -172,8 +202,9 @@ namespace AZ
 
                     for (auto& shader : materialTypeSourceData.GetValue().m_shaderCollection)
                     {
-                        AddPossibleDependencies(request.m_sourceFile, shader.m_shaderFilePath,
-                            response.m_sourceFileDependencyList, "Shader Asset",
+                        AddPossibleDependencies(request.m_sourceFile,
+                            shader.m_shaderFilePath,
+                            "Shader Asset",
                             outputJobDescriptor.m_jobDependencyList);
                     }
 
@@ -183,9 +214,10 @@ namespace AZ
 
                         for (const MaterialFunctorSourceData::AssetDependency& dependency : dependencies)
                         {
-                            AddPossibleDependencies(request.m_sourceFile, dependency.m_sourceFilePath,
-                                response.m_sourceFileDependencyList,
-                                dependency.m_jobKey.c_str(), outputJobDescriptor.m_jobDependencyList);
+                            AddPossibleDependencies(request.m_sourceFile,
+                                dependency.m_sourceFilePath,
+                                dependency.m_jobKey.c_str(),
+                                outputJobDescriptor.m_jobDependencyList);
                         }
                     }
                 }
@@ -220,9 +252,10 @@ namespace AZ
 
                     // Register dependency on the parent material source file so we can load it and use it's data to build this variant material.
                     // Note, we don't need a direct dependency on the material type because the parent material will depend on it.
-                    AddPossibleDependencies(request.m_sourceFile, parentMaterialPath,
-                        response.m_sourceFileDependencyList,
-                        JobKey, outputJobDescriptor.m_jobDependencyList);
+                    AddPossibleDependencies(request.m_sourceFile,
+                        parentMaterialPath,
+                        JobKey,
+                        outputJobDescriptor.m_jobDependencyList);
                 }
             }
             
@@ -259,8 +292,8 @@ namespace AZ
 
             return materialTypeAssetOutcome.GetValue();
         }
-
-        AZ::Data::Asset<MaterialAsset> CreateMaterialAsset(AZStd::string_view materialSourceFilePath, const rapidjson::Value& json)
+        
+        AZ::Data::Asset<MaterialAsset> MaterialBuilder::CreateMaterialAsset(AZStd::string_view materialSourceFilePath, const rapidjson::Value& json) const
         {
             auto material = LoadSourceData<MaterialSourceData>(json, materialSourceFilePath);
 
@@ -269,7 +302,9 @@ namespace AZ
                 return {};
             }
 
-            auto materialAssetOutcome = material.GetValue().CreateMaterialAsset(Uuid::CreateRandom(), materialSourceFilePath, true);
+            MaterialAssetProcessingMode processingMode = MaterialUtils::BuildersShouldFinalizeMaterialAssets() ? MaterialAssetProcessingMode::PreBake : MaterialAssetProcessingMode::DeferredBake;
+
+            auto materialAssetOutcome = material.GetValue().CreateMaterialAsset(Uuid::CreateRandom(), materialSourceFilePath, processingMode, ReportMaterialAssetWarningsAsErrors());
             if (!materialAssetOutcome.IsSuccess())
             {
                 return {};
@@ -298,7 +333,7 @@ namespace AZ
             AZStd::string fullSourcePath;
             AzFramework::StringFunc::Path::ConstructFull(request.m_watchFolder.data(), request.m_sourceFile.data(), fullSourcePath, true);
 
-            auto loadOutcome = JsonSerializationUtils::ReadJsonFile(fullSourcePath);
+            auto loadOutcome = JsonSerializationUtils::ReadJsonFile(fullSourcePath, AZ::RPI::JsonUtils::DefaultMaxFileSize);
             if (!loadOutcome.IsSuccess())
             {
                 AZ_Error(MaterialBuilderName, false, "Failed to load material file: %s", loadOutcome.GetError().c_str());

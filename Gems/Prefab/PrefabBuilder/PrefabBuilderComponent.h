@@ -14,7 +14,7 @@
 #include <AzCore/IO/SystemFile.h>
 #include <AzCore/Module/Module.h>
 #include <AzCore/Module/DynamicModuleHandle.h>
-#include <AzFramework/FileFunc/FileFunc.h>
+#include <AzCore/Serialization/Json/JsonUtils.h>
 #include <AzToolsFramework/Prefab/PrefabSystemComponent.h>
 #include <AzToolsFramework/Prefab/Spawnable/PrefabConversionPipeline.h>
 #include <Fingerprinting/TypeFingerprinter.h>
@@ -53,7 +53,7 @@ namespace AZ::Prefab
             const AzToolsFramework::Prefab::PrefabDom& genericDocument);
         bool ProcessPrefab(
             const AZ::PlatformTagSet& platformTags, const char* filePath, AZ::IO::PathView tempDirPath, const AZ::Uuid& sourceFileUuid,
-            AzToolsFramework::Prefab::PrefabDom& mutableRootDom,
+            AzToolsFramework::Prefab::PrefabDom&& rootDom,
             AZStd::vector<AssetBuilderSDK::JobProduct>& jobProducts);
 
     protected:
